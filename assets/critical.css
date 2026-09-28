@@ -115,3 +115,54 @@ body {
 .shopify-section > .full-width {
   grid-column: 1 / -1;
 }
+
+/** Flock intro overlay (homepage only) */
+
+/**
+ * The intro covers the real homepage, which renders normally underneath. The
+ * charcoal here is only a pre-p5 fallback so there is no white flash; once the
+ * canvas exists, `is-ready` makes the shell transparent so the p5 background
+ * alone controls the reveal.
+ */
+.flock-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  overflow: hidden;
+  background-color: #1b1b1a;
+}
+
+.flock-intro.is-ready {
+  background-color: transparent;
+}
+
+/* p5 sets the canvas's own pixel and inline CSS size; the mount just fills the
+   shell so there is no layout shift. */
+.flock-intro__canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* Keyboard-operable equivalent of clicking the p5-drawn mark. Transparent, and
+   sized to the centred mark rather than the whole viewport. */
+.flock-intro__trigger {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  inline-size: clamp(11rem, 20vw, 20rem);
+  block-size: clamp(5.5rem, 12vw, 11rem);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  appearance: none;
+}
+
+/* Hold the page still while the intro is the active surface; flock-intro.js
+   removes this class when the transition completes. */
+.flock-intro-lock {
+  overflow: hidden;
+}

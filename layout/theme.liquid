@@ -27,6 +27,22 @@
   </head>
 
   <body>
+    {% comment %}
+      Flock intro: homepage only, and never in the theme editor, where a full-page
+      overlay would block merchants from selecting and editing sections.
+
+      Deferred scripts execute in document order, so this order is the dependency
+      order: p5 runtime, then the sketch that uses it, then the DOM adapter.
+      Do not switch these to async.
+    {% endcomment %}
+    {% if request.page_type == 'index' and request.design_mode != true %}
+      {% render 'flock-intro' %}
+
+      <script src="{{ 'p5.min.js' | asset_url }}" defer></script>
+      <script src="{{ 'flock-transition.js' | asset_url }}" defer></script>
+      <script src="{{ 'flock-intro.js' | asset_url }}" defer></script>
+    {% endif %}
+
     {% sections 'header-group' %}
 
     {{ content_for_layout }}

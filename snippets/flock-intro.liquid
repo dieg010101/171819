@@ -1,0 +1,20 @@
+{% comment %}
+  Full-viewport p5 bird intro shown over the real homepage.
+
+  The visible "seventeen / eighteen / nineteen" mark is drawn by p5 on the canvas,
+  never in the DOM, so it is not rendered twice. The button below is a real,
+  keyboard-operable control over the same interaction, sized to the centred mark.
+
+  Gating (homepage only, and never in the theme editor) lives in layout/theme.liquid.
+{% endcomment %}
+
+<div class="flock-intro" data-flock-intro>
+  <div class="flock-intro__canvas" data-flock-canvas></div>
+
+  <button
+    class="flock-intro__trigger"
+    type="button"
+    data-flock-trigger
+    aria-label="Enter seventeeneighteennineteen"
+  ></button>
+</div>
