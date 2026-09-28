@@ -1,0 +1,661 @@
+{%- comment -%}
+  Cover Flow-inspired featured product gallery.
+
+  Products come from the `products` setting; when a merchant has not picked any
+  yet, we fall back to the first items of collections.all so a fresh store shows
+  something real. Markup is a plain, readable row of product links; JavaScript
+  adds `is-enhanced` and turns it into the 3D stage, so a script failure still
+  leaves working product links.
+{%- endcomment -%}
+
+{%- liquid
+  assign featured = section.settings.products
+  if featured.size == 0
+    assign featured = collections.all.products
+  endif
+
+  assign total = featured.size
+  if total > 5
+    assign total = 5
+  endif
+-%}
+
+<div
+  class="coverflow full-width"
+  data-product-coverflow
+  role="group"
+  aria-roledescription="carousel"
+  aria-label="Featured products"
+>
+  {%- if total == 0 -%}
+    <p class="coverflow__empty">
+      No products selected yet. Choose up to five products in the theme editor, or add
+      products to your store.
+    </p>
+  {%- else -%}
+    <div class="coverflow__stage" data-coverflow-stage>
+      <ul class="coverflow__track" data-coverflow-track>
+        {%- for product in featured limit: 5 -%}
+          {%- liquid
+            assign image = product.featured_image
+            # The first card is the initial centre plane and is above the fold.
+            assign loading = 'lazy'
+            if forloop.first
+              assign loading = 'eager'
+            endif
+          -%}
+          <li class="coverflow__item" data-coverflow-item data-offset="{{ forloop.index0 }}">
+            <a class="coverflow__card" href="{{ product.url }}" data-coverflow-link>
+              <span class="coverflow__plane">
+                {%- if image -%}
+                  {{
+                    image
+                    | image_url: width: 700
+                    | image_tag:
+                      class: 'coverflow__img',
+                      widths: '260, 340, 420, 520, 700',
+                      sizes: '(min-width: 750px) 340px, 76vw',
+                      loading: loading,
+                      alt: image.alt | default: product.title
+                  }}
+                {%- else -%}
+                  <span class="coverflow__img coverflow__img--placeholder" aria-hidden="true"></span>
+                {%- endif -%}
+              </span>
+              <span class="coverflow__title">{{ product.title }}</span>
+            </a>
+          </li>
+        {%- endfor -%}
+      </ul>
+
+      {%- if total > 1 -%}
+        <button class="coverflow__nav coverflow__nav--prev" type="button" data-coverflow-prev aria-label="Previous product">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" aria-hidden="true" focusable="false">
+            <path d="M15 4 7 12l8 8" stroke="currentColor" stroke-width="1.25" stroke-linecap="square"/>
+          </svg>
+        </button>
+        <button class="coverflow__nav coverflow__nav--next" type="button" data-coverflow-next aria-label="Next product">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" aria-hidden="true" focusable="false">
+            <path d="M9 4l8 8-8 8" stroke="currentColor" stroke-width="1.25" stroke-linecap="square"/>
+          </svg>
+        </button>
+      {%- endif -%}
+    </div>
+
+    <p class="coverflow__count">
+      <span data-coverflow-current>01</span>
+      <span class="coverflow__count-sep" aria-hidden="true">/</span>
+      <span>{{ total | prepend: '0' }}</span>
+    </p>
+
+    {%- comment -%} Slide changes are announced here so the visible count stays terse. {%- endcomment -%}
+    <p class="coverflow__sr" aria-live="polite" data-coverflow-live></p>
+  {%- endif -%}
+</div>
+
+{% stylesheet %}
+  /* The section is a flex child of <body>, which is min-height 100svh. A full
+     viewport of its own, below the header, is what keeps the footer out of the
+     first screen; the stage is anchored to the top so the extra height lands
+     below the fold rather than pushing the products down. */
+  .shopify-section:has(> .coverflow) {
+    flex: 1 1 auto;
+    min-height: 100svh;
+  }
+
+  .coverflow {
+    --cf-card-w: clamp(210px, 30vw, 340px);
+    --cf-card-h: calc(var(--cf-card-w) * 1.5);
+    /* Wide enough that each plane clears its neighbour: separate objects, not
+       one folded strip. */
+    --cf-step-1: var(--cf-card-w);
+    /* Side-mounted controls sit in a gutter at each viewport edge. */
+    --cf-nav-inset: clamp(0.75rem, 1.5vw, 2rem);
+    --cf-nav-reserve: calc(var(--cf-nav-inset) + 44px + 1rem);
+    /* ±2 pulls in only when its outer edge would reach that gutter. The outer
+       edge projects to about step × 0.814 + card × 0.235 from the centre, given
+       the ±2 depth, turn and scale below and the 1600px perspective; retune
+       these two factors if any of those change. */
+    --cf-step-2: min(
+      var(--cf-card-w) * 1.8,
+      (50vw - var(--cf-nav-reserve) - var(--cf-card-w) * 0.235) / 0.814
+    );
+    --cf-rot-1: 38deg;
+    --cf-rot-2: 50deg;
+    /* Depth carries the recession, so the veil can stay light on ±1. */
+    --cf-z-1: -170px;
+    --cf-z-2: -380px;
+    --cf-scale-1: 0.84;
+    --cf-scale-2: 0.66;
+    --cf-veil-1: 0.26;
+    --cf-veil-2: 0.62;
+    --cf-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+    --cf-duration: 420ms;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: clamp(1.25rem, 3vh, 2.375rem);
+    padding: clamp(0.75rem, 2.5vh, 1.75rem) 0 clamp(2rem, 6vh, 4.5rem);
+    min-height: 0;
+    color: var(--color-foreground);
+    /* Deep planes are meant to bleed past the edges on narrow screens; clip the
+       horizontal axis so they never widen the document. `clip` (not `hidden`)
+       leaves the vertical axis alone, so the floor shadows still show. */
+    overflow-x: clip;
+  }
+
+  .coverflow__empty {
+    padding: 4rem var(--page-margin);
+    text-align: center;
+    font-size: 0.875rem;
+    letter-spacing: 0.02em;
+    opacity: 0.7;
+  }
+
+  .coverflow__stage {
+    position: relative;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  /* --- Unenhanced fallback: a plain, scrollable row of real product links --- */
+  .coverflow__track {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: flex-start;
+    align-items: center;
+    list-style: none;
+    margin: 0;
+    padding: 0 var(--page-margin);
+    overflow-x: auto;
+    width: 100%;
+  }
+
+  .coverflow__item {
+    flex: 0 0 auto;
+    width: var(--cf-card-w);
+  }
+
+  .coverflow__card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .coverflow__plane {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: var(--cf-card-h);
+    overflow: hidden;
+    /* Black optical glass: a faint vertical sheen over a dark plane, not frosted UI. */
+    border: 1px solid rgb(255 255 255 / 9%);
+    border-radius: 2px;
+    background-image: linear-gradient(
+      180deg,
+      rgb(255 255 255 / 5.5%) 0%,
+      rgb(255 255 255 / 1.2%) 38%,
+      rgb(0 0 0 / 28%) 100%
+    );
+    background-color: #141414;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 10%),
+      0 24px 56px -22px rgb(0 0 0 / 85%),
+      0 6px 18px -10px rgb(0 0 0 / 60%);
+  }
+
+  .coverflow__img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .coverflow__img--placeholder {
+    display: block;
+    background-color: #1f1f1f;
+  }
+
+  /* Product names stay in the accessible name of each link, but the reference
+     composition is image-only, so they are not painted. */
+  .coverflow__title,
+  .coverflow__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .coverflow__count {
+    font-size: 0.8125rem;
+    letter-spacing: 0.22em;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+    color: var(--color-foreground);
+    opacity: 0.8;
+  }
+
+  .coverflow__count-sep {
+    margin: 0 0.35em;
+    opacity: 0.55;
+  }
+
+  .coverflow__nav {
+    position: absolute;
+    top: 50%;
+    translate: 0 -50%;
+    z-index: 40;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--color-foreground);
+    opacity: 0.55;
+    cursor: pointer;
+    transition:
+      opacity 200ms ease,
+      background-color 200ms ease;
+  }
+
+  .coverflow__nav--prev { left: var(--cf-nav-inset); }
+  .coverflow__nav--next { right: var(--cf-nav-inset); }
+
+  .coverflow__nav:hover,
+  .coverflow__nav:focus-visible {
+    opacity: 1;
+    background-color: rgb(255 255 255 / 7%);
+  }
+
+  .coverflow :is(a, button):focus-visible {
+    outline: 1px solid var(--color-foreground);
+    outline-offset: 4px;
+  }
+
+  /* --- Enhanced: the 3D cover flow stage --- */
+  .coverflow.is-enhanced .coverflow__stage {
+    height: var(--cf-card-h);
+    perspective: 1600px;
+    perspective-origin: 50% 50%;
+    /* Let the browser own vertical scrolling; we only interpret horizontal drags. */
+    touch-action: pan-y;
+  }
+
+  .coverflow.is-enhanced .coverflow__track {
+    display: block;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    overflow: visible;
+    transform-style: preserve-3d;
+  }
+
+  .coverflow.is-enhanced .coverflow__item {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: var(--cf-card-w);
+    height: var(--cf-card-h);
+    transform-origin: 50% 50%;
+    will-change: transform;
+    transition:
+      transform var(--cf-duration) var(--cf-ease),
+      opacity var(--cf-duration) var(--cf-ease);
+  }
+
+  .coverflow.is-enhanced .coverflow__card {
+    height: 100%;
+  }
+
+  /* Depth veil: cheaper and more controllable than filtering five large planes. */
+  .coverflow.is-enhanced .coverflow__plane::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-color: #000;
+    opacity: 0;
+    transition: opacity var(--cf-duration) var(--cf-ease);
+    pointer-events: none;
+  }
+
+  /* Floor shadow, grounding the plane without a mirrored copy. Its core sits
+     high, tucked under the plane's lower edge, so it reads as cast downward. */
+  .coverflow.is-enhanced .coverflow__card::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: -3.5%;
+    width: 74%;
+    height: 4.5%;
+    translate: -50% 0;
+    background-image: radial-gradient(ellipse 50% 60% at 50% 25%, rgb(0 0 0 / 75%), rgb(0 0 0 / 0%) 100%);
+    opacity: 0.9;
+    pointer-events: none;
+  }
+
+  .coverflow.is-enhanced [data-offset='0'] {
+    transform: translateX(-50%) translateZ(0) rotateY(0deg) scale(1);
+    z-index: 30;
+  }
+
+  /* Side planes turn to face the centre: the inner edge leads. */
+  .coverflow.is-enhanced [data-offset='-1'] {
+    transform: translateX(calc(-50% - var(--cf-step-1))) translateZ(var(--cf-z-1)) rotateY(var(--cf-rot-1)) scale(var(--cf-scale-1));
+    z-index: 20;
+  }
+
+  .coverflow.is-enhanced [data-offset='1'] {
+    transform: translateX(calc(-50% + var(--cf-step-1))) translateZ(var(--cf-z-1)) rotateY(calc(-1 * var(--cf-rot-1))) scale(var(--cf-scale-1));
+    z-index: 20;
+  }
+
+  .coverflow.is-enhanced [data-offset='-2'] {
+    transform: translateX(calc(-50% - var(--cf-step-2))) translateZ(var(--cf-z-2)) rotateY(var(--cf-rot-2)) scale(var(--cf-scale-2));
+    z-index: 10;
+  }
+
+  .coverflow.is-enhanced [data-offset='2'] {
+    transform: translateX(calc(-50% + var(--cf-step-2))) translateZ(var(--cf-z-2)) rotateY(calc(-1 * var(--cf-rot-2))) scale(var(--cf-scale-2));
+    z-index: 10;
+  }
+
+  .coverflow.is-enhanced [data-offset='-1'] .coverflow__plane::after,
+  .coverflow.is-enhanced [data-offset='1'] .coverflow__plane::after {
+    opacity: var(--cf-veil-1);
+  }
+
+  .coverflow.is-enhanced [data-offset='-2'] .coverflow__plane::after,
+  .coverflow.is-enhanced [data-offset='2'] .coverflow__plane::after {
+    opacity: var(--cf-veil-2);
+  }
+
+  /* Anything beyond ±2 waits off-stage rather than stacking up behind the centre. */
+  .coverflow.is-enhanced [data-offset='hidden'] {
+    transform: translateX(-50%) translateZ(-460px) scale(0.6);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .coverflow.is-enhanced.is-dragging .coverflow__item {
+    transition: none;
+  }
+
+  /* Tablets: 30vw leaves the active plane too slight, so it takes a larger share
+     of the width and the ±2 planes pull in far enough to still peek. */
+  @media (min-width: 750px) and (max-width: 1099px) {
+    .coverflow {
+      --cf-card-w: clamp(290px, 38vw, 320px);
+      --cf-step-2: calc(var(--cf-card-w) * 1.6);
+    }
+  }
+
+  /* Below 1100px the ±1 planes run close to the viewport edge, leaving no gutter
+     for side controls, so they sit under the stage, clear of every plane. */
+  @media (max-width: 1099px) {
+    .coverflow__nav {
+      top: auto;
+      bottom: -0.75rem;
+      translate: 0 0;
+    }
+
+    .coverflow__nav--prev { left: max(0.5rem, calc(50% - var(--cf-card-w) * 0.5 - 3.25rem)); }
+    .coverflow__nav--next { right: max(0.5rem, calc(50% - var(--cf-card-w) * 0.5 - 3.25rem)); }
+  }
+
+  @media (max-width: 749px) {
+    .coverflow {
+      --cf-card-w: min(76vw, 320px);
+      /* Neighbours only peek in, and lie flatter than on desktop. */
+      --cf-step-1: calc(var(--cf-card-w) * 0.74);
+      --cf-step-2: calc(var(--cf-card-w) * 1.1);
+      --cf-rot-1: 32deg;
+      --cf-rot-2: 40deg;
+      --cf-z-1: -180px;
+      --cf-z-2: -420px;
+      --cf-scale-1: 0.8;
+      --cf-scale-2: 0.6;
+      --cf-veil-1: 0.42;
+      --cf-veil-2: 0.8;
+
+      gap: clamp(1.75rem, 4vh, 3rem);
+      /* Top-anchored like desktop. The second term grows the top space on tall
+         phones so the stage sits where centring used to put it, rather than
+         jumping up to the header. */
+      padding: max(clamp(2rem, 6vh, 4.5rem), calc(20vh - 5rem)) 0 clamp(2rem, 6vh, 4.5rem);
+    }
+
+    .coverflow.is-enhanced .coverflow__stage {
+      perspective: 1100px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .coverflow.is-enhanced .coverflow__item,
+    .coverflow.is-enhanced .coverflow__plane::after,
+    .coverflow__nav {
+      transition-duration: 1ms;
+    }
+  }
+{% endstylesheet %}
+
+{% javascript %}
+  (function () {
+    'use strict';
+
+    var SECTION = '[data-product-coverflow]';
+    // A drag must travel this far, and be clearly horizontal, before it navigates.
+    var DRAG_PX = 40;
+    var DIRECTION_RATIO = 1.2;
+
+    function init(root) {
+      if (root.dataset.coverflowReady === 'true') return;
+
+      var items = Array.prototype.slice.call(root.querySelectorAll('[data-coverflow-item]'));
+      if (!items.length) return;
+
+      root.dataset.coverflowReady = 'true';
+
+      var stage = root.querySelector('[data-coverflow-stage]');
+      var live = root.querySelector('[data-coverflow-live]');
+      var current = root.querySelector('[data-coverflow-current]');
+      var prev = root.querySelector('[data-coverflow-prev]');
+      var next = root.querySelector('[data-coverflow-next]');
+      var links = items.map(function (item) {
+        return item.querySelector('[data-coverflow-link]');
+      });
+      var titles = items.map(function (item) {
+        var t = item.querySelector('.coverflow__title');
+        return t ? t.textContent.trim() : '';
+      });
+
+      var total = items.length;
+      var active = 0;
+      var dragged = false;
+
+      root.classList.add('is-enhanced');
+
+      function pad(n) {
+        return n < 10 ? '0' + n : String(n);
+      }
+
+      // Signed distance from the active index, wrapping the short way round.
+      function offsetOf(i) {
+        var d = (i - active + total) % total;
+        if (d > total / 2) d -= total;
+        return d;
+      }
+
+      function render(announce) {
+        for (var i = 0; i < total; i++) {
+          var off = offsetOf(i);
+          var visible = Math.abs(off) <= 2;
+          items[i].dataset.offset = visible ? String(off) : 'hidden';
+          if (links[i]) {
+            // Only the centre plane sits in the tab sequence; the rest are reached
+            // with the arrow controls.
+            links[i].tabIndex = off === 0 ? 0 : -1;
+          }
+        }
+        items[active].setAttribute('aria-current', 'true');
+        for (var j = 0; j < total; j++) {
+          if (j !== active) items[j].removeAttribute('aria-current');
+        }
+        if (current) current.textContent = pad(active + 1);
+        if (announce && live) {
+          live.textContent = titles[active] + ', ' + (active + 1) + ' of ' + total;
+        }
+      }
+
+      function setActive(i, announce) {
+        var n = ((i % total) + total) % total;
+        if (n === active) return;
+        active = n;
+        render(announce !== false);
+      }
+
+      if (prev) {
+        prev.addEventListener('click', function () {
+          setActive(active - 1);
+        });
+      }
+      if (next) {
+        next.addEventListener('click', function () {
+          setActive(active + 1);
+        });
+      }
+
+      // Scoped to the section: the listener only sees keys while focus is inside it,
+      // so page-level arrow behaviour is untouched.
+      root.addEventListener('keydown', function (event) {
+        if (event.metaKey || event.ctrlKey || event.altKey) return;
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          setActive(active - 1);
+        } else if (event.key === 'ArrowRight') {
+          event.preventDefault();
+          setActive(active + 1);
+        }
+      });
+
+      items.forEach(function (item, i) {
+        var link = links[i];
+        if (!link) return;
+        link.addEventListener('click', function (event) {
+          if (dragged) {
+            // The pointer sequence was a swipe, not a tap.
+            event.preventDefault();
+            dragged = false;
+            return;
+          }
+          if (i !== active) {
+            event.preventDefault();
+            setActive(i);
+          }
+          // The active card keeps its default navigation to product.url.
+        });
+      });
+
+      if (stage) {
+        var startX = 0;
+        var startY = 0;
+        var axis = '';
+        var tracking = false;
+
+        stage.addEventListener('pointerdown', function (event) {
+          if (event.button !== 0 && event.pointerType === 'mouse') return;
+          tracking = true;
+          dragged = false;
+          axis = '';
+          startX = event.clientX;
+          startY = event.clientY;
+        });
+
+        stage.addEventListener('pointermove', function (event) {
+          if (!tracking) return;
+          var dx = event.clientX - startX;
+          var dy = event.clientY - startY;
+          if (!axis) {
+            if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+            axis = Math.abs(dx) > Math.abs(dy) * DIRECTION_RATIO ? 'x' : 'y';
+            if (axis === 'x') {
+              root.classList.add('is-dragging');
+              if (stage.setPointerCapture) {
+                try { stage.setPointerCapture(event.pointerId); } catch (e) { /* not capturable */ }
+              }
+            } else {
+              // Vertical intent: let the page scroll normally.
+              tracking = false;
+            }
+          }
+        });
+
+        function endDrag(event) {
+          if (!tracking) return;
+          tracking = false;
+          root.classList.remove('is-dragging');
+          var dx = event.clientX - startX;
+          if (axis === 'x' && Math.abs(dx) >= DRAG_PX) {
+            dragged = true;
+            setActive(dx < 0 ? active + 1 : active - 1);
+          }
+          axis = '';
+        }
+
+        stage.addEventListener('pointerup', endDrag);
+        stage.addEventListener('pointercancel', function () {
+          tracking = false;
+          axis = '';
+          root.classList.remove('is-dragging');
+        });
+      }
+
+      render(false);
+    }
+
+    function initAll(scope) {
+      (scope || document).querySelectorAll(SECTION).forEach(init);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () { initAll(); });
+    } else {
+      initAll();
+    }
+
+    // Theme editor re-renders the section; re-initialise just that subtree.
+    document.addEventListener('shopify:section:load', function (event) {
+      initAll(event.target);
+    });
+  })();
+{% endjavascript %}
+
+{% schema %}
+{
+  "name": "Product cover flow",
+  "settings": [
+    {
+      "type": "product_list",
+      "id": "products",
+      "label": "Products",
+      "limit": 5
+    }
+  ],
+  "presets": [
+    {
+      "name": "Product cover flow"
+    }
+  ]
+}
+{% endschema %}

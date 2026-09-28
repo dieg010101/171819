@@ -10,7 +10,7 @@
 {
   "sections": {
     "main": {
-      "type": "custom-section",
+      "type": "home-product-coverflow",
       "settings": {}
     }
   },
