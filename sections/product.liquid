@@ -1,45 +1,1181 @@
 {% comment %}
-  This section is used in the product template to render product page with
-  media, content, and add-to-cart form.
+  Product detail page: thumbnail rail · primary media plate · product information.
+
+  Everything commerce-critical is server-rendered. The form is a plain Shopify
+  product form posting to /cart/add; its `name="id"` <select> is the source of
+  truth for the submitted variant. JavaScript only adds the option buttons'
+  behaviour, keeps that select in sync, and updates price/availability/media.
+  Without JS the select itself is shown (see the <noscript> styles below).
 
   https://shopify.dev/docs/storefronts/themes/architecture/templates/product
 {% endcomment %}
 
-<div class="product-images">
-  {% for image in product.images %}
-    {% render 'image', class: 'product-image', image: image %}
-  {% endfor %}
-</div>
+{%- liquid
+  assign current_variant = product.selected_or_first_available_variant
+  assign media_count = product.media.size
 
-<div class="product-info">
-  <h1>{{ product.title }}</h1>
-  <p>{{ product.price | money }}</p>
-  <p>{{ product.description }}</p>
-</div>
+  # Open on the selected variant's own media when it has one.
+  assign active_media = product.featured_media
+  if current_variant.featured_media
+    assign active_media = current_variant.featured_media
+  endif
 
-<div class="product-form">
-  {% form 'product', product %}
-    {% assign current_variant = product.selected_or_first_available_variant %}
+  # The plate takes the proportions of the first media so switching images
+  # never resizes it; other media are contained within that field.
+  assign plate_ratio = 0.6667
+  if product.featured_media
+    assign plate_ratio = product.featured_media.preview_image.aspect_ratio | default: 0.6667
+  endif
 
-    <select name="id">
-      {% for variant in product.variants %}
-        <option
-          value="{{ variant.id }}"
-          {% if variant == current_variant %}
-            selected="selected"
-          {% endif %}
+  assign form_id = 'ProductForm-' | append: section.id
+  assign status_label = 'Available'
+  if current_variant.available == false
+    assign status_label = 'Sold out'
+  endif
+
+  assign has_policies = false
+  if shop.shipping_policy != blank or shop.refund_policy != blank
+    assign has_policies = true
+  endif
+-%}
+
+<div
+  class="pdp full-width"
+  style="--pdp-ratio: {{ plate_ratio }};"
+  data-pdp
+>
+  <div class="pdp__grid">
+    {%- comment -%} Media: one set of slides; CSS decides between a stacked plate (desktop) and a swipeable scroll-snap track (tablet/phone). {%- endcomment -%}
+    <div class="pdp__media{% if media_count < 2 %} pdp__media--single{% endif %}">
+      <div class="pdp__plate">
+        <ul class="pdp__slides" data-pdp-slides>
+          {%- for media in product.media -%}
+            {%- liquid
+              assign is_active = false
+              if media.id == active_media.id
+                assign is_active = true
+              endif
+              assign alt = media.alt | default: product.title
+            -%}
+            <li
+              class="pdp__slide{% if is_active %} is-active{% endif %}"
+              id="PdpMedia-{{ section.id }}-{{ media.id }}"
+              data-pdp-slide
+              data-media-id="{{ media.id }}"
+              aria-label="{{ forloop.index }} of {{ media_count }}"
+            >
+              {%- case media.media_type -%}
+                {%- when 'video' -%}
+                  {{ media | video_tag: image_size: '1400x', controls: true, class: 'pdp__media-el' }}
+                {%- when 'external_video' -%}
+                  {{ media | external_video_tag: class: 'pdp__media-el' }}
+                {%- else -%}
+                  {%- comment -%} Images, and the preview image of 3D models (this theme has no model viewer). {%- endcomment -%}
+                  {%- liquid
+                    assign loading = 'lazy'
+                    assign priority = 'auto'
+                    if is_active
+                      assign loading = 'eager'
+                      assign priority = 'high'
+                    endif
+                  -%}
+                  {{
+                    media.preview_image
+                    | image_url: width: 1400
+                    | image_tag:
+                      class: 'pdp__media-el',
+                      widths: '360, 480, 640, 800, 960, 1100, 1400',
+                      sizes: '(min-width: 1024px) 30vw, calc(100vw - 40px)',
+                      loading: loading,
+                      fetchpriority: priority,
+                      alt: alt
+                  }}
+              {%- endcase -%}
+            </li>
+          {%- else -%}
+            <li class="pdp__slide is-active" data-pdp-slide>
+              {{ 'product-apparel-1' | placeholder_svg_tag: 'pdp__media-el pdp__placeholder' }}
+            </li>
+          {%- endfor -%}
+        </ul>
+      </div>
+
+      {%- if media_count > 1 -%}
+        <ol class="pdp__thumbs" aria-label="Product media">
+          {%- for media in product.media -%}
+            <li>
+              <button
+                class="pdp__thumb"
+                type="button"
+                data-pdp-thumb
+                data-index="{{ forloop.index0 }}"
+                aria-controls="PdpMedia-{{ section.id }}-{{ media.id }}"
+                aria-label="Show {% if media.media_type == 'image' %}image{% else %}media{% endif %} {{ forloop.index }} of {{ media_count }}"
+                {% if media.id == active_media.id %}
+                  aria-current="true"
+                {% endif %}
+              >
+                {{
+                  media.preview_image
+                  | image_url: width: 240
+                  | image_tag: widths: '80, 120, 160, 240', sizes: '(min-width: 1024px) 6vw, 56px', loading: 'lazy', alt: ''
+                }}
+              </button>
+            </li>
+          {%- endfor -%}
+        </ol>
+
+        <p class="pdp__index" aria-hidden="true">
+          <span data-pdp-index>
+            {%- for media in product.media -%}
+              {%- if media.id == active_media.id -%}{{ forloop.index | prepend: '0' | slice: -2, 2 }}{%- endif -%}
+            {%- endfor -%}
+          </span>
+          <span class="pdp__index-sep">/</span>
+          {{ media_count | prepend: '0' | slice: -2, 2 }}
+        </p>
+      {%- endif -%}
+    </div>
+
+    <div class="pdp__info">
+      <h1 class="pdp__title">{{ product.title }}</h1>
+
+      <p class="pdp__price">
+        <span class="pdp__sr" data-pdp-price-label>
+          {%- if current_variant.compare_at_price > current_variant.price -%}Sale price{%- else -%}Price{%- endif -%}
+        </span>
+        <span data-pdp-price>{{ current_variant.price | money_without_trailing_zeros }}</span>
+        <s class="pdp__compare" data-pdp-compare {% unless current_variant.compare_at_price > current_variant.price %}hidden{% endunless %}>
+          <span class="pdp__sr">Regular price</span>
+          <span data-pdp-compare-value>{{ current_variant.compare_at_price | money_without_trailing_zeros }}</span>
+        </s>
+      </p>
+      {%- comment -%} Availability is carried by the button and the option states; this keeps it in text for assistive tech. {%- endcomment -%}
+      <p class="pdp__sr" data-pdp-status>{{ status_label }}</p>
+
+      {%- unless product.has_only_default_variant -%}
+        <div class="pdp__options">
+          {%- for option in product.options_with_values -%}
+            {%- assign option_index = forloop.index0 -%}
+            <fieldset class="pdp__row pdp__option" data-pdp-option>
+              <legend class="pdp__row-label">{{ option.name }}</legend>
+              <div class="pdp__values">
+                {%- for value in option.values -%}
+                  {%- liquid
+                    assign value_id = 'Option-' | append: section.id | append: '-' | append: option_index | append: '-' | append: forloop.index0
+                    assign state = 'available'
+                    if value.variant == blank
+                      assign state = 'unavailable'
+                    elsif value.available == false
+                      assign state = 'soldout'
+                    endif
+                  -%}
+                  <input
+                    class="pdp__value-input"
+                    type="radio"
+                    id="{{ value_id }}"
+                    name="Option-{{ section.id }}-{{ option_index }}"
+                    value="{{ value | escape }}"
+                    {% if value.selected %}
+                      checked
+                    {% endif %}
+                  >
+                  <label class="pdp__value" for="{{ value_id }}" data-state="{{ state }}">
+                    <span class="pdp__value-text">{{ value }}</span>
+                    <span class="pdp__sr" data-pdp-value-state>
+                      {%- if state == 'soldout' -%}, sold out{%- elsif state == 'unavailable' -%}, unavailable{%- endif -%}
+                    </span>
+                  </label>
+                {%- endfor -%}
+              </div>
+              {%- comment -%}
+                Size guide hook: a link belongs here, beside the size values, once
+                products carry a size guide (e.g. a page-reference metafield).
+              {%- endcomment -%}
+            </fieldset>
+          {%- endfor -%}
+        </div>
+      {%- endunless -%}
+
+      {%- form 'product', product, id: form_id, class: 'pdp__form' -%}
+        <div class="pdp__row pdp__variant-fallback{% if product.has_only_default_variant %} pdp__variant-fallback--default{% endif %}">
+          <label class="pdp__row-label" for="Variant-{{ section.id }}">Option</label>
+          <select class="pdp__select" id="Variant-{{ section.id }}" name="id" data-pdp-variant-select>
+            {%- for variant in product.variants -%}
+              <option
+                value="{{ variant.id }}"
+                {% if variant == current_variant %}
+                  selected="selected"
+                {% endif %}
+                {% unless variant.available %}
+                  disabled
+                {% endunless %}
+              >
+                {{ variant.title }} — {{ variant.price | money_without_trailing_zeros }}
+                {%- unless variant.available %} (sold out){% endunless -%}
+              </option>
+            {%- endfor -%}
+          </select>
+        </div>
+
+        <div class="pdp__row pdp__qty-row">
+          <label class="pdp__row-label" for="Quantity-{{ section.id }}">Qty</label>
+          <div class="pdp__qty">
+            <button class="pdp__qty-btn" type="button" data-pdp-qty="-1" aria-label="Decrease quantity">
+              <span aria-hidden="true">−</span>
+            </button>
+            <input
+              class="pdp__qty-input"
+              type="number"
+              id="Quantity-{{ section.id }}"
+              name="quantity"
+              min="1"
+              value="1"
+              inputmode="numeric"
+              data-pdp-qty-input
+            >
+            <button class="pdp__qty-btn" type="button" data-pdp-qty="1" aria-label="Increase quantity">
+              <span aria-hidden="true">+</span>
+            </button>
+          </div>
+        </div>
+
+        <button
+          class="pdp__submit"
+          type="submit"
+          name="add"
+          data-pdp-submit
+          data-label-add="Add to cart"
+          data-label-soldout="Sold out"
+          data-label-unavailable="Unavailable"
+          {% unless current_variant.available %}
+            disabled
+          {% endunless %}
         >
-          {{ variant.title }} - {{ variant.price | money }}
-        </option>
-      {% endfor %}
-    </select>
+          {%- if current_variant.available -%}Add to cart{%- else -%}Sold out{%- endif -%}
+        </button>
 
-    <input type="text" name="quantity" min="1" value="1">
+        <div class="pdp__dynamic" data-pdp-dynamic {% unless current_variant.available %}hidden{% endunless %}>
+          {{ form | payment_button }}
+        </div>
+      {%- endform -%}
 
-    <input type="submit" value="Add to cart">
-    {{ form | payment_button }}
-  {% endform %}
+      {%- comment -%} Variant changes are announced once, here, rather than from every updated node. {%- endcomment -%}
+      <p class="pdp__sr" aria-live="polite" data-pdp-live></p>
+
+      {%- comment -%}
+        Disclosures appear only when Shopify has content for them. A DETAILS
+        row belongs between these two once products carry structured details
+        (materials, care, fit) as metafields.
+      {%- endcomment -%}
+      {%- if product.description != blank or has_policies -%}
+        <div class="pdp__notes">
+          {%- if product.description != blank -%}
+            <details class="pdp__disclosure">
+              <summary class="pdp__summary">
+                <span>Description</span>
+                <span class="pdp__summary-icon" aria-hidden="true"></span>
+              </summary>
+              <div class="pdp__prose">{{ product.description }}</div>
+            </details>
+          {%- endif -%}
+
+          {%- if has_policies -%}
+            <details class="pdp__disclosure">
+              <summary class="pdp__summary">
+                <span>Shipping</span>
+                <span class="pdp__summary-icon" aria-hidden="true"></span>
+              </summary>
+              <ul class="pdp__prose pdp__links">
+                {%- if shop.shipping_policy != blank -%}
+                  <li><a href="{{ shop.shipping_policy.url }}">{{ shop.shipping_policy.title }}</a></li>
+                {%- endif -%}
+                {%- if shop.refund_policy != blank -%}
+                  <li><a href="{{ shop.refund_policy.url }}">{{ shop.refund_policy.title }}</a></li>
+                {%- endif -%}
+              </ul>
+            </details>
+          {%- endif -%}
+        </div>
+      {%- endif -%}
+    </div>
+  </div>
+
+  {%- comment -%} Minimal per-variant data for the enhancement; money is formatted here so JS never re-implements the store's money format. {%- endcomment -%}
+  <script type="application/json" data-pdp-variants>
+    [
+      {%- for variant in product.variants -%}
+        {
+          "id": {{ variant.id }},
+          "title": {{ variant.title | json }},
+          "options": {{ variant.options | json }},
+          "available": {{ variant.available | json }},
+          "price": {{ variant.price | money_without_trailing_zeros | json }},
+          "compare": {% if variant.compare_at_price > variant.price %}{{ variant.compare_at_price | money_without_trailing_zeros | json }}{% else %}null{% endif %},
+          "media": {{ variant.featured_media.id | json }}
+        }{% unless forloop.last %},{% endunless %}
+      {%- endfor -%}
+    ]
+  </script>
 </div>
+
+{%- comment -%} Without JS the option buttons cannot change the submitted variant, so the native select takes their place, and all media is reachable by scrolling. {%- endcomment -%}
+<noscript>
+  <style>
+    .pdp .pdp__options,
+    .pdp .pdp__thumbs,
+    .pdp .pdp__index,
+    .pdp .pdp__qty-btn { display: none; }
+    .pdp .pdp__variant-fallback:not(.pdp__variant-fallback--default) { display: grid; }
+    .pdp .pdp__slides { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; }
+    .pdp .pdp__slide { flex: 0 0 100%; opacity: 1; visibility: visible; }
+  </style>
+</noscript>
+
+{% stylesheet %}
+  .pdp {
+    --pdp-rule: color-mix(in srgb, var(--color-foreground) 26%, transparent);
+    --pdp-line: color-mix(in srgb, var(--color-foreground) 55%, transparent);
+    --pdp-quiet: color-mix(in srgb, var(--color-foreground) 55%, var(--color-background));
+    --pdp-plate: color-mix(in srgb, var(--color-background) 80%, var(--color-foreground));
+    --pdp-gutter: 64px;
+    --pdp-label-w: 3.75rem;
+    --pdp-box: 52px;
+    --pdp-ease: 200ms ease;
+
+    padding: 0.5rem var(--pdp-gutter) clamp(4rem, 10vh, 7rem);
+    color: var(--color-foreground);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .pdp__grid {
+    display: grid;
+    row-gap: 2rem;
+  }
+
+  .pdp__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .pdp :is(a, button, summary, select, input):focus-visible,
+  .pdp__value-input:focus-visible + .pdp__value {
+    outline: 1px solid var(--color-foreground);
+    outline-offset: 3px;
+  }
+
+  /* --- Media --------------------------------------------------------------- */
+
+  .pdp__media {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'plate plate'
+      'thumbs index';
+    column-gap: 1rem;
+    row-gap: 0.75rem;
+    align-items: start;
+    min-width: 0;
+  }
+
+  .pdp__plate {
+    grid-area: plate;
+    background-color: var(--pdp-plate);
+  }
+
+  /* Tablet/phone: a native horizontal scroll-snap track. */
+  .pdp__slides {
+    display: flex;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  .pdp__slides::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pdp__slide {
+    flex: 0 0 100%;
+    aspect-ratio: var(--pdp-ratio);
+    max-height: 64svh;
+    scroll-snap-align: start;
+  }
+
+  .pdp__media-el {
+    display: block;
+    width: 100%;
+    height: 100%;
+    /* Garments are never cropped; off-ratio media sits within the plate. */
+    object-fit: contain;
+    border: 0;
+  }
+
+  .pdp__placeholder {
+    fill: var(--pdp-quiet);
+  }
+
+  .pdp__thumbs {
+    grid-area: thumbs;
+    display: flex;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .pdp__thumb {
+    display: block;
+    width: 44px;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    opacity: 0.55;
+    transition: opacity var(--pdp-ease);
+  }
+
+  .pdp__thumb img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: var(--pdp-ratio);
+    object-fit: contain;
+    background-color: var(--pdp-plate);
+  }
+
+  .pdp__thumb:hover,
+  .pdp__thumb[aria-current='true'] {
+    opacity: 1;
+  }
+
+  .pdp__index {
+    grid-area: index;
+    margin: 0;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    font-variant-numeric: tabular-nums;
+    color: var(--pdp-quiet);
+  }
+
+  .pdp__index-sep {
+    margin: 0 0.3em;
+  }
+
+  /* --- Product information ------------------------------------------------ */
+
+  .pdp__info {
+    min-width: 0;
+  }
+
+  /* Title and price: one light, open-tracked voice at two sizes. */
+  .pdp__title {
+    margin: 0;
+    font-size: clamp(22px, 2.2vw, 30px);
+    font-weight: 400;
+    line-height: 1.15;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .pdp__price {
+    margin: 0.55em 0 0;
+    font-size: clamp(20px, 2vw, 28px);
+    line-height: 1.15;
+    letter-spacing: 0.06em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pdp__compare {
+    margin-left: 0.4em;
+    font-size: 0.6em;
+    color: var(--pdp-quiet);
+  }
+
+  .pdp__options {
+    display: grid;
+    gap: 1rem;
+    margin-top: 2.25rem;
+  }
+
+  /* Label beside controls; SIZE and QTY share the label width so their boxes
+     start on the same edge. */
+  .pdp__row {
+    display: grid;
+    grid-template-columns: var(--pdp-label-w) minmax(0, 1fr);
+    align-items: start;
+    column-gap: 1.5rem;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  /* Floated, the legend becomes an ordinary grid item in the label column. */
+  .pdp__row-label {
+    float: left;
+    padding: 0;
+    /* Centred on the first line of boxes, even when the values wrap. */
+    line-height: var(--pdp-box);
+    font-size: 16px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .pdp__values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+  }
+
+  .pdp__value-input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .pdp__value {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--pdp-box);
+    height: var(--pdp-box);
+    border: 1px solid var(--pdp-line);
+    font-size: 15px;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition:
+      border-color var(--pdp-ease),
+      background-color var(--pdp-ease),
+      color var(--pdp-ease);
+  }
+
+  .pdp__value:hover {
+    border-color: var(--color-foreground);
+  }
+
+  .pdp__value-input:checked + .pdp__value {
+    border-color: var(--color-foreground);
+    background-color: var(--color-foreground);
+    color: var(--color-background);
+  }
+
+  /* Sold out: still selectable (so its state can be read), with a hairline
+     slash rather than hidden. */
+  .pdp__value[data-state='soldout'] {
+    border-color: var(--pdp-rule);
+    color: var(--pdp-quiet);
+    background-image: linear-gradient(
+      to top right,
+      transparent calc(50% - 0.5px),
+      currentcolor calc(50% - 0.5px),
+      currentcolor calc(50% + 0.5px),
+      transparent calc(50% + 0.5px)
+    );
+  }
+
+  .pdp__value-input:checked + .pdp__value[data-state='soldout'] {
+    border-color: var(--pdp-quiet);
+    background-color: var(--pdp-quiet);
+    color: var(--color-background);
+  }
+
+  /* No variant exists for this combination. */
+  .pdp__value[data-state='unavailable'] {
+    border-style: dashed;
+    border-color: var(--pdp-rule);
+    color: var(--pdp-quiet);
+  }
+
+  .pdp__form {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .pdp__variant-fallback {
+    display: none;
+  }
+
+  .pdp__select {
+    min-height: 52px;
+    width: 100%;
+    padding: 0 0.75rem;
+    border: 1px solid var(--pdp-line);
+    border-radius: 0;
+    color: inherit;
+    font-size: 15px;
+  }
+
+  /* Quantity in the same box language as the sizes. */
+  .pdp__qty {
+    display: inline-grid;
+    grid-template-columns: repeat(3, var(--pdp-box));
+    column-gap: 0.8rem;
+    justify-self: start;
+  }
+
+  .pdp__qty-btn,
+  .pdp__qty-input {
+    height: var(--pdp-box);
+    padding: 0;
+    border: 1px solid var(--pdp-line);
+    border-radius: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+  }
+
+  .pdp__qty-btn {
+    cursor: pointer;
+    transition: border-color var(--pdp-ease);
+  }
+
+  .pdp__qty-btn:hover:not(:disabled) {
+    border-color: var(--color-foreground);
+  }
+
+  .pdp__qty-btn:disabled {
+    border-color: var(--pdp-rule);
+    color: var(--pdp-quiet);
+    cursor: default;
+  }
+
+  .pdp__qty-input {
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+
+  .pdp__qty-input::-webkit-inner-spin-button,
+  .pdp__qty-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .pdp__submit {
+    width: 100%;
+    height: 60px;
+    margin-top: 1.25rem;
+    padding: 0 1rem;
+    border: 1px solid var(--color-foreground);
+    border-radius: 0;
+    background-color: transparent;
+    color: var(--color-foreground);
+    font: inherit;
+    font-size: 17px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition:
+      background-color var(--pdp-ease),
+      color var(--pdp-ease),
+      transform 120ms ease;
+  }
+
+  .pdp__submit:hover:not(:disabled) {
+    background-color: var(--color-foreground);
+    color: var(--color-background);
+  }
+
+  .pdp__submit:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .pdp__submit:disabled {
+    border-color: var(--pdp-rule);
+    color: var(--pdp-quiet);
+    cursor: not-allowed;
+  }
+
+  /* Dynamic checkout stays secondary: a quiet text action under the CTA. */
+  .pdp__dynamic {
+    --shopify-accelerated-checkout-button-block-size: 44px;
+    --shopify-accelerated-checkout-button-border-radius: 0px;
+    --shopify-accelerated-checkout-row-gap: 4px;
+  }
+
+  .pdp__dynamic .shopify-payment-button__button {
+    min-height: 44px;
+    border-radius: 0;
+  }
+
+  .pdp__dynamic .shopify-payment-button__button--unbranded {
+    background-color: transparent;
+    color: var(--color-foreground);
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+  }
+
+  .pdp__dynamic .shopify-payment-button__button--unbranded:hover:not([disabled]) {
+    background-color: transparent;
+    text-decoration-color: transparent;
+  }
+
+  .pdp__dynamic .shopify-payment-button__more-options {
+    color: var(--pdp-quiet);
+    font-size: 11px;
+  }
+
+  /* --- Disclosures -------------------------------------------------------- */
+
+  .pdp__notes {
+    margin-top: 1.5rem;
+  }
+
+  /* Rules sit between rows, not above the first or below the last. */
+  .pdp__disclosure:not(:last-child) {
+    border-bottom: 1px solid var(--pdp-rule);
+  }
+
+  .pdp__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 58px;
+    font-size: 16px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .pdp__summary::-webkit-details-marker {
+    display: none;
+  }
+
+  /* A hairline plus that closes to a minus; the open state itself is exposed
+     natively by <details>. */
+  .pdp__summary-icon {
+    position: relative;
+    width: 13px;
+    height: 13px;
+    margin-right: 0.35rem;
+  }
+
+  .pdp__summary-icon::before,
+  .pdp__summary-icon::after {
+    content: '';
+    position: absolute;
+    inset: 6px 0 auto;
+    height: 1px;
+    background-color: currentcolor;
+    transition: transform var(--pdp-ease);
+  }
+
+  .pdp__summary-icon::after {
+    transform: rotate(90deg);
+  }
+
+  .pdp__disclosure[open] .pdp__summary-icon::after {
+    transform: rotate(0deg);
+  }
+
+  .pdp__prose {
+    max-width: 36em;
+    margin: 0;
+    padding-bottom: 1.25rem;
+    color: var(--pdp-quiet);
+    text-wrap: pretty;
+  }
+
+  .pdp__prose > * + * {
+    margin-top: 0.7em;
+  }
+
+  .pdp__prose :is(ul, ol) {
+    padding-left: 1.1em;
+  }
+
+  .pdp__prose a {
+    color: var(--color-foreground);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .pdp__links {
+    padding-left: 0;
+    list-style: none;
+  }
+
+  /* --- Desktop: rail · plate · information, as one centred composition ------ */
+
+  @media (min-width: 1024px) {
+    .pdp {
+      --pdp-rail-w: clamp(64px, 6vw, 92px);
+      --pdp-rail-gap: clamp(40px, 4.9vw, 72px);
+      /* Width-led, but never taller than the space under the header. */
+      --pdp-plate-w: min(clamp(320px, 30vw, 480px), calc((100svh - 12rem) * var(--pdp-ratio)));
+      /* Wide enough for five size boxes on one line. */
+      --pdp-info-w: clamp(400px, 32vw, 500px);
+    }
+
+    .pdp__grid {
+      grid-template-columns:
+        calc(var(--pdp-rail-w) + var(--pdp-rail-gap) + var(--pdp-plate-w))
+        var(--pdp-info-w);
+      column-gap: clamp(40px, 4.7vw, 72px);
+      justify-content: center;
+      align-items: start;
+    }
+
+    .pdp__media {
+      grid-template-columns: var(--pdp-rail-w) var(--pdp-plate-w);
+      grid-template-areas: 'thumbs plate';
+      column-gap: var(--pdp-rail-gap);
+    }
+
+    .pdp__media--single {
+      grid-template-areas: '. plate';
+    }
+
+    /* One plate, slides stacked in place; the active one fades in. */
+    .pdp__slides {
+      display: grid;
+      overflow: visible;
+    }
+
+    .pdp__slide {
+      grid-area: 1 / 1;
+      max-height: none;
+      opacity: 0;
+      visibility: hidden;
+      transition:
+        opacity var(--pdp-ease),
+        visibility 0s linear 200ms;
+    }
+
+    .pdp__slide.is-active {
+      opacity: 1;
+      visibility: visible;
+      transition: opacity var(--pdp-ease);
+    }
+
+    /* The rail never sets the row height; it takes the plate's and scrolls. */
+    .pdp__thumbs {
+      flex-direction: column;
+      align-self: stretch;
+      gap: 1rem;
+      overflow: hidden auto;
+      contain: size;
+    }
+
+    .pdp__thumb {
+      width: 100%;
+    }
+
+    .pdp__index {
+      display: none;
+    }
+  }
+
+  /* --- Below desktop: media first, information beneath ---------------------- */
+
+  @media (max-width: 1023px) {
+    .pdp__info {
+      width: 100%;
+      max-width: 34rem;
+    }
+  }
+
+  @media (max-width: 700px) {
+    /* Matches the header's own 20px inset at this width. */
+    .pdp {
+      --pdp-gutter: 20px;
+      --pdp-label-w: 3rem;
+    }
+
+    .pdp__grid {
+      row-gap: 1.5rem;
+    }
+
+    .pdp__row-label,
+    .pdp__summary {
+      font-size: 14px;
+    }
+
+    .pdp__row {
+      column-gap: 1rem;
+    }
+
+    .pdp {
+      --pdp-box: 46px;
+    }
+
+    .pdp__values,
+    .pdp__qty {
+      gap: 6px;
+    }
+
+    .pdp__submit {
+      height: 56px;
+      font-size: 15px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pdp *,
+    .pdp *::before,
+    .pdp *::after {
+      transition-duration: 1ms !important;
+      transition-delay: 0s !important;
+      scroll-behavior: auto !important;
+    }
+  }
+{% endstylesheet %}
+
+{% javascript %}
+  (function () {
+    'use strict';
+
+    var ROOT = '[data-pdp]';
+
+    function pad(n) {
+      return n < 10 ? '0' + n : String(n);
+    }
+
+    function init(root) {
+      if (root.dataset.pdpReady === 'true') return;
+
+      var data = root.querySelector('[data-pdp-variants]');
+      if (!data) return;
+
+      var variants;
+      try {
+        variants = JSON.parse(data.textContent);
+      } catch (e) {
+        // Leave the server-rendered form untouched rather than half-enhance it.
+        return;
+      }
+
+      root.dataset.pdpReady = 'true';
+
+      var fieldsets = Array.prototype.slice.call(root.querySelectorAll('[data-pdp-option]'));
+      var select = root.querySelector('[data-pdp-variant-select]');
+      var submit = root.querySelector('[data-pdp-submit]');
+      var dynamic = root.querySelector('[data-pdp-dynamic]');
+      var price = root.querySelector('[data-pdp-price]');
+      var priceLabel = root.querySelector('[data-pdp-price-label]');
+      var compare = root.querySelector('[data-pdp-compare]');
+      var compareValue = root.querySelector('[data-pdp-compare-value]');
+      var status = root.querySelector('[data-pdp-status]');
+      var live = root.querySelector('[data-pdp-live]');
+
+      var track = root.querySelector('[data-pdp-slides]');
+      var slides = Array.prototype.slice.call(root.querySelectorAll('[data-pdp-slide]'));
+      var thumbs = Array.prototype.slice.call(root.querySelectorAll('[data-pdp-thumb]'));
+      var index = root.querySelector('[data-pdp-index]');
+      var active = Math.max(0, slides.findIndex(function (s) { return s.classList.contains('is-active'); }));
+      var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+      /* ---------- Media ---------- */
+
+      // Tablet/phone CSS lays the slides out as a scroll-snap track; desktop
+      // stacks them. Asking the layout keeps breakpoints in CSS only.
+      function isTrack() {
+        return track && track.scrollWidth > track.clientWidth + 1;
+      }
+
+      function showMedia(i, scroll) {
+        if (i < 0 || i >= slides.length) return;
+        if (i !== active) {
+          slides[active].classList.remove('is-active');
+          var video = slides[active].querySelector('video');
+          if (video) video.pause();
+        }
+        active = i;
+        slides[i].classList.add('is-active');
+        thumbs.forEach(function (t, n) {
+          if (n === i) t.setAttribute('aria-current', 'true');
+          else t.removeAttribute('aria-current');
+        });
+        if (index) index.textContent = pad(i + 1);
+        if (scroll && isTrack()) {
+          track.scrollTo({
+            left: slides[i].offsetLeft - track.offsetLeft,
+            behavior: reduceMotion.matches || scroll === 'instant' ? 'auto' : 'smooth'
+          });
+        }
+      }
+
+      thumbs.forEach(function (thumb) {
+        thumb.addEventListener('click', function () {
+          showMedia(Number(thumb.dataset.index), true);
+        });
+      });
+
+      if (track) {
+        var ticking = false;
+        track.addEventListener('scroll', function () {
+          if (ticking || !isTrack()) return;
+          ticking = true;
+          requestAnimationFrame(function () {
+            ticking = false;
+            var i = Math.round(track.scrollLeft / track.clientWidth);
+            if (i !== active) showMedia(i, false);
+          });
+        }, { passive: true });
+
+        // Crossing into the track layout (or loading on a variant's media)
+        // needs the scroll position to match the active slide.
+        var resizeTimer;
+        window.addEventListener('resize', function () {
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(function () { showMedia(active, 'instant'); }, 150);
+        });
+        if (active > 0) showMedia(active, 'instant');
+      }
+
+      /* ---------- Variants ---------- */
+
+      function selectedOptions() {
+        return fieldsets.map(function (fs) {
+          var checked = fs.querySelector('input:checked');
+          return checked ? checked.value : null;
+        });
+      }
+
+      function findVariant(options) {
+        for (var i = 0; i < variants.length; i++) {
+          var v = variants[i];
+          var match = true;
+          for (var j = 0; j < options.length; j++) {
+            if (v.options[j] !== options[j]) { match = false; break; }
+          }
+          if (match) return v;
+        }
+        return null;
+      }
+
+      // Each value is judged against the *other* current selections, so a value
+      // is only "sold out" or "unavailable" for the combination it would make.
+      function updateValueStates(options) {
+        fieldsets.forEach(function (fs, i) {
+          fs.querySelectorAll('input').forEach(function (input) {
+            var candidate = options.slice();
+            candidate[i] = input.value;
+            var v = findVariant(candidate);
+            var state = !v ? 'unavailable' : v.available ? 'available' : 'soldout';
+            var label = input.nextElementSibling;
+            label.dataset.state = state;
+            var note = label.querySelector('[data-pdp-value-state]');
+            if (note) note.textContent = state === 'soldout' ? ', sold out' : state === 'unavailable' ? ', unavailable' : '';
+          });
+        });
+      }
+
+      function render(variant, announce) {
+        var state = !variant ? 'unavailable' : variant.available ? 'available' : 'soldout';
+
+        if (variant) select.value = String(variant.id);
+        else select.selectedIndex = -1;
+
+        if (variant) {
+          price.textContent = variant.price;
+          compare.hidden = !variant.compare;
+          if (variant.compare) compareValue.textContent = variant.compare;
+          priceLabel.textContent = variant.compare ? 'Sale price' : 'Price';
+        }
+
+        var statusText = state === 'available' ? 'Available' : state === 'soldout' ? 'Sold out' : 'Unavailable';
+        status.textContent = statusText;
+
+        submit.disabled = state !== 'available';
+        submit.textContent =
+          state === 'available' ? submit.dataset.labelAdd :
+          state === 'soldout' ? submit.dataset.labelSoldout : submit.dataset.labelUnavailable;
+        if (dynamic) dynamic.hidden = state !== 'available';
+
+        if (variant && variant.media) {
+          var slideIndex = slides.findIndex(function (s) { return s.dataset.mediaId === String(variant.media); });
+          if (slideIndex !== -1) showMedia(slideIndex, true);
+        }
+
+        if (variant) {
+          var url = new URL(window.location.href);
+          url.searchParams.set('variant', variant.id);
+          window.history.replaceState(window.history.state, '', url.toString());
+        }
+
+        if (announce && live) {
+          live.textContent = (variant ? variant.title + ', ' + variant.price + ', ' : '') + statusText;
+        }
+      }
+
+      fieldsets.forEach(function (fs) {
+        fs.addEventListener('change', function () {
+          var options = selectedOptions();
+          updateValueStates(options);
+          render(findVariant(options), true);
+        });
+      });
+
+      /* ---------- Quantity ---------- */
+
+      var qtyInput = root.querySelector('[data-pdp-qty-input]');
+      var qtyButtons = Array.prototype.slice.call(root.querySelectorAll('[data-pdp-qty]'));
+
+      function syncQty() {
+        var min = Number(qtyInput.min) || 1;
+        qtyButtons.forEach(function (b) {
+          if (Number(b.dataset.pdpQty) < 0) b.disabled = (Number(qtyInput.value) || min) <= min;
+        });
+      }
+
+      if (qtyInput) {
+        qtyButtons.forEach(function (b) {
+          b.addEventListener('click', function () {
+            if (Number(b.dataset.pdpQty) > 0) qtyInput.stepUp();
+            else qtyInput.stepDown();
+            qtyInput.dispatchEvent(new Event('change', { bubbles: true }));
+          });
+        });
+        qtyInput.addEventListener('change', function () {
+          var min = Number(qtyInput.min) || 1;
+          if (!(Number(qtyInput.value) >= min)) qtyInput.value = min;
+          syncQty();
+        });
+        syncQty();
+      }
+    }
+
+    function initAll(scope) {
+      (scope || document).querySelectorAll(ROOT).forEach(init);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () { initAll(); });
+    } else {
+      initAll();
+    }
+
+    document.addEventListener('shopify:section:load', function (event) {
+      initAll(event.target);
+    });
+  })();
+{% endjavascript %}
 
 {% schema %}
 {
