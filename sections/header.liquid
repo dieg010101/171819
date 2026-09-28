@@ -1,77 +1,135 @@
-<header>
-  <h2 class="header__title">
-    {{ shop.name | link_to: routes.root_url }}
-  </h2>
+{% comment %}
+  Site header: SHOP · stacked brand mark · CART (n).
 
-  <div class="header__menu">
-    {% for link in section.settings.menu.links %}
-      {{ link.title | link_to: link.url }}
-    {% endfor %}
-  </div>
+  Rendered full-bleed (the `full-width` utility opts out of the .shopify-section
+  content grid) so the dark bar spans the viewport while the inset is controlled
+  here, matching the Figma insets without absolute positioning.
+{% endcomment %}
 
-  <div class="header__icons">
-    {% if shop.customer_accounts_enabled %}
-      <shopify-account menu="{{ section.settings.customer_account_menu }}">
-        {{ 'icon-account.svg' | inline_asset_content }}
-      </shopify-account>
-    {% endif %}
+<header class="site-header full-width">
+  <nav class="site-header__nav" aria-label="Primary">
+    <a class="site-header__link" href="{{ routes.all_products_collection_url }}">Shop</a>
+  </nav>
 
-    <a href="{{ routes.cart_url }}">
-      {% if cart.item_count > 0 %}
-        <sup>{{ cart.item_count }}</sup>
-      {% endif %}
+  <a
+    class="site-header__brand"
+    href="{{ routes.root_url }}"
+    aria-label="seventeeneighteennineteen — home"
+  >
+    <span class="site-header__brand-line site-header__brand-line--strong">seventeen</span>
+    <span class="site-header__brand-line">eighteen</span>
+    <span class="site-header__brand-line site-header__brand-line--strong">nineteen</span>
+  </a>
 
-      {{ 'icon-cart.svg' | inline_asset_content }}
-    </a>
-  </div>
+  <a class="site-header__link site-header__cart" href="{{ routes.cart_url }}">
+    Cart ({{ cart.item_count }})
+  </a>
 </header>
 
 {% stylesheet %}
-  header {
-    height: 5rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+  .site-header {
+    /* Local to the header until a site-wide token pass lands. */
+    --site-header-bg: #1b1b1b;
+    --site-header-fg: #bfbfbf;
+    --site-header-fg-hover: #e8e8e8;
+
+    display: grid;
+    /* Outer columns flex equally, so the centre column stays optically centred
+       regardless of how wide SHOP or CART get. */
+    grid-template-columns: 1fr auto 1fr;
+    align-items: start;
+    gap: 1.5rem;
+    padding: 34px 64px;
+    background-color: var(--site-header-bg);
+    /* Inter, served by Shopify from the theme's primary font setting — see
+       snippets/css-variables.liquid. Not a locally-installed or CDN font. */
+    font-family: var(--font-primary--family);
   }
-  header a {
-    position: relative;
+
+  .site-header__nav {
+    justify-self: start;
+  }
+
+  .site-header__cart {
+    justify-self: end;
+  }
+
+  .site-header__link {
+    /* inline-block so line-height applies to the box: SHOP and CART then share
+       the brand's first-line baseline instead of aligning by coincidence. */
+    display: inline-block;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 30px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
     text-decoration: none;
-    color: var(--color-foreground);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    white-space: nowrap;
+    color: var(--site-header-fg);
+    transition: color 0.15s ease;
+    /* Grow the touch target to ~44px without moving the text: the padding and the
+       negative margin cancel out, so only the hit area changes. */
+    padding: 12px;
+    margin: -12px;
   }
-  header a sup {
-    position: absolute;
-    left: 100%;
-    overflow: hidden;
-    max-width: var(--page-margin);
+
+  .site-header__brand {
+    justify-self: center;
+    display: block;
+    /* The mark is right-aligned within its own block, as in the Figma and the
+       flock intro logo. */
+    text-align: right;
+    text-decoration: none;
+    font-size: 32px;
+    line-height: 30px;
+    color: var(--site-header-fg);
+    transition: color 0.15s ease;
   }
-  header svg {
-    width: 2rem;
+
+  /* Weight and tracking are paired exactly as in the flock wordmark
+     (CONFIG.logo.lines): 700 lines track -0.04em, the 400 line -0.015em. */
+  .site-header__brand-line {
+    display: block;
+    font-weight: 400;
+    letter-spacing: -0.015em;
   }
-  header .header__menu,
-  header .header__icons {
-    display: flex;
-    gap: 1rem;
+
+  .site-header__brand-line--strong {
+    font-weight: 700;
+    letter-spacing: -0.04em;
+  }
+
+  .site-header__link:hover,
+  .site-header__brand:hover {
+    color: var(--site-header-fg-hover);
+  }
+
+  .site-header a:focus-visible {
+    outline: 1px solid var(--site-header-fg-hover);
+    outline-offset: 4px;
+  }
+
+  @media (max-width: 700px) {
+    .site-header {
+      gap: 1rem;
+      padding: 20px;
+    }
+
+    .site-header__link {
+      font-size: 13px;
+      line-height: 20px;
+    }
+
+    .site-header__brand {
+      font-size: 20px;
+      line-height: 19px;
+    }
   }
 {% endstylesheet %}
 
 {% schema %}
 {
   "name": "t:general.header",
-  "settings": [
-    {
-      "type": "link_list",
-      "id": "menu",
-      "label": "t:labels.menu"
-    },
-    {
-      "type": "link_list",
-      "id": "customer_account_menu",
-      "label": "t:labels.customer_account_menu",
-      "default": "customer-account-main-menu"
-    }
-  ]
+  "settings": []
 }
 {% endschema %}
