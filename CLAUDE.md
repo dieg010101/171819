@@ -25,6 +25,20 @@ Plain Liquid + CSS + browser JS. No framework, no build step.
 - Namespace CSS; select elements via `data-` attributes rather than IDs.
 - Comments explain *why*, not obvious syntax.
 
+# Component conventions (for NEW work)
+
+These guide new implementation — notably translating the Figma. Do not mechanically
+migrate existing working code to comply.
+
+- Sections = page-level, merchant-customizable modules. Theme blocks = reusable,
+  nestable customizable content. Snippets = reusable fragments the theme editor
+  never sees. JSON templates compose sections; `layout/theme.liquid` stays a thin shell.
+- Component-specific CSS and JS live with their section/block via `{% stylesheet %}`
+  and `{% javascript %}`, not in a growing global bundle.
+- `assets/critical.css` stays small: genuinely critical, shared, global CSS only.
+- Render initial page content in Liquid/HTML; do not reconstruct it in JS.
+- Avoid large global JS bundles. Serve assets through Shopify's CDN via `asset_url`.
+
 # Protected commerce areas
 
 Do not alter any of the following unless the user specifically asks for that area:
