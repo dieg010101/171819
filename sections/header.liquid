@@ -28,9 +28,8 @@
 
 {% stylesheet %}
   .site-header {
-    /* Local to the header until a site-wide token pass lands. */
-    --site-header-bg: #1b1b1b;
-    --site-header-fg: #bfbfbf;
+    /* Background/foreground come from the global theme colors. The hover tint has
+       no global equivalent yet, so it stays local. */
     --site-header-fg-hover: #e8e8e8;
 
     display: grid;
@@ -40,7 +39,7 @@
     align-items: start;
     gap: 1.5rem;
     padding: 34px 64px;
-    background-color: var(--site-header-bg);
+    background-color: var(--color-background);
     /* Inter, served by Shopify from the theme's primary font setting — see
        snippets/css-variables.liquid. Not a locally-installed or CDN font. */
     font-family: var(--font-primary--family);
@@ -65,7 +64,7 @@
     text-transform: uppercase;
     text-decoration: none;
     white-space: nowrap;
-    color: var(--site-header-fg);
+    color: var(--color-foreground);
     transition: color 0.15s ease;
     /* Grow the touch target to ~44px without moving the text: the padding and the
        negative margin cancel out, so only the hit area changes. */
@@ -82,7 +81,7 @@
     text-decoration: none;
     font-size: 32px;
     line-height: 30px;
-    color: var(--site-header-fg);
+    color: var(--color-foreground);
     transition: color 0.15s ease;
   }
 
