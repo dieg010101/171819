@@ -1,33 +1,870 @@
 {% comment %}
-  This section is used in the cart template to render /cart page with an
-  overview of the items in customer's cart.
+  Cart page: a structured list of line items (image · product · quantity ·
+  total · remove) over a summary and a full-width checkout bar.
+
+  Commerce is the standard Shopify cart form: quantities post as `updates[]`
+  to /cart, checkout is the form's `checkout` submit, and remove uses each
+  line's own `url_to_remove`. With JavaScript, − / + and typed quantities
+  change one line through the Ajax /cart/change.js endpoint instead, which
+  (unlike the form's update) validates inventory; without JS the quantity is
+  typed and applied with the Update button.
 
   https://shopify.dev/docs/storefronts/themes/architecture/templates/cart
 {% endcomment %}
 
-<h1>{{ 'cart.title' | t }}</h1>
+<div
+  class="cart full-width"
+  data-cart
+  data-cart-url="{{ routes.cart_url }}"
+  data-change-url="{{ routes.cart_change_url }}"
+>
+  <div class="cart__head">
+    <h1 class="cart__title">{{ 'cart.title' | t }}</h1>
+    {%- if cart.item_count > 0 -%}
+      <p class="cart__count">
+        {{ cart.item_count }}
+        {% if cart.item_count == 1 %}item{% else %}items{% endif %}
+      </p>
+    {%- endif -%}
+  </div>
 
-<form action="{{ routes.cart_url }}" method="post">
-  <table>
-    {% for item in cart.items %}
-      <tr>
-        <td>
-          {% render 'image', image: item.image, url: item.url %}
-        </td>
-        <td>
-          <p>{{ item.product.title }}</p>
-          {{ 'cart.remove' | t | link_to: item.url_to_remove }}
-        </td>
-        <td>
-          <input type="text" name="updates[]" value="{{ item.quantity }}">
-          <input type="submit" value="{{ 'cart.update' | t }}">
-        </td>
-      </tr>
-    {% endfor %}
-  </table>
+  {%- if cart.item_count > 0 -%}
+    <form class="cart__form" action="{{ routes.cart_url }}" method="post" data-cart-form>
+      {%- comment -%} Column labels are visual only; each cell carries its own accessible label. {%- endcomment -%}
+      <div class="cart__cols" aria-hidden="true">
+        <span class="cart__col-label cart__col-label--product">Product</span>
+        <span class="cart__col-label cart__col-label--qty">Quantity</span>
+        <span class="cart__col-label cart__col-label--total">Total</span>
+      </div>
 
-  <input type="submit" name="checkout" value="{{ 'cart.checkout' | t }}">
-</form>
+      <ul class="cart__items">
+        {%- for item in cart.items -%}
+          <li class="cart__item" data-cart-line="{{ item.key }}">
+            <a class="cart__image" href="{{ item.url }}" tabindex="-1" aria-hidden="true">
+              {%- if item.image -%}
+                {%- liquid
+                  assign loading = 'lazy'
+                  if forloop.index <= 3
+                    assign loading = 'eager'
+                  endif
+                -%}
+                {{
+                  item.image
+                  | image_url: width: 480
+                  | image_tag:
+                    widths: '120, 180, 240, 320, 480',
+                    sizes: '(min-width: 800px) 150px, 104px',
+                    loading: loading,
+                    alt: ''
+                }}
+              {%- else -%}
+                {{ 'product-apparel-1' | placeholder_svg_tag: 'cart__placeholder' }}
+              {%- endif -%}
+            </a>
+
+            <div class="cart__info">
+              <a class="cart__name" href="{{ item.url }}">{{ item.product.title }}</a>
+
+              {%- unless item.product.has_only_default_variant -%}
+                <dl class="cart__meta">
+                  {%- for option in item.options_with_values -%}
+                    <div class="cart__meta-row">
+                      <dt>{{ option.name }}</dt>
+                      <dd>{{ option.value }}</dd>
+                    </div>
+                  {%- endfor -%}
+                </dl>
+              {%- endunless -%}
+
+              {%- if item.selling_plan_allocation -%}
+                <p class="cart__note">{{ item.selling_plan_allocation.selling_plan.name }}</p>
+              {%- endif -%}
+
+              {%- for property in item.properties -%}
+                {%- assign first_char = property.first | slice: 0 -%}
+                {%- if property.last != blank and first_char != '_' -%}
+                  <p class="cart__note">{{ property.first }}: {{ property.last }}</p>
+                {%- endif -%}
+              {%- endfor -%}
+
+              <p class="cart__unit">
+                <span class="cart__sr">Price</span>
+                {{ item.final_price | money_without_trailing_zeros }}
+              </p>
+
+              {%- for allocation in item.line_level_discount_allocations -%}
+                <p class="cart__note">
+                  {{ allocation.discount_application.title }} (−{{ allocation.amount | money_without_trailing_zeros }})
+                </p>
+              {%- endfor -%}
+            </div>
+
+            <div class="cart__qty">
+              {%- assign step = item.variant.quantity_rule.increment | default: 1 -%}
+              <button
+                class="cart__qty-btn"
+                type="button"
+                data-cart-step="-{{ step }}"
+                aria-label="Decrease quantity of {{ item.product.title | escape }}"
+              >
+                <span aria-hidden="true">−</span>
+              </button>
+              <label class="cart__sr" for="Quantity-{{ forloop.index }}">
+                Quantity of {{ item.product.title | escape }}
+              </label>
+              <input
+                class="cart__qty-input"
+                type="number"
+                id="Quantity-{{ forloop.index }}"
+                name="updates[]"
+                value="{{ item.quantity }}"
+                min="0"
+                step="{{ step }}"
+                {% if item.variant.quantity_rule.max %}
+                  max="{{ item.variant.quantity_rule.max }}"
+                {% endif %}
+                inputmode="numeric"
+                data-cart-qty
+              >
+              <button
+                class="cart__qty-btn"
+                type="button"
+                data-cart-step="{{ step }}"
+                aria-label="Increase quantity of {{ item.product.title | escape }}"
+              >
+                <span aria-hidden="true">+</span>
+              </button>
+            </div>
+
+            <p class="cart__total">
+              <span class="cart__sr">Total</span>
+              {%- if item.original_line_price != item.final_line_price -%}
+                <s class="cart__was">
+                  <span class="cart__sr">Regular price</span>
+                  {{ item.original_line_price | money_without_trailing_zeros }}
+                </s>
+              {%- endif -%}
+              <span>{{ item.final_line_price | money_without_trailing_zeros }}</span>
+            </p>
+
+            <a class="cart__remove" href="{{ item.url_to_remove }}">
+              {{ 'cart.remove' | t }}<span class="cart__sr"> {{ item.product.title }}</span>
+            </a>
+          </li>
+        {%- endfor -%}
+      </ul>
+
+      {%- comment -%} Announces Shopify's response to a quantity change; the visible copy sits on the line itself. {%- endcomment -%}
+      <p class="cart__sr" aria-live="polite" data-cart-live></p>
+
+      <div class="cart__summary">
+        {%- comment -%}
+          First submit in the form, so pressing Enter in a quantity field updates
+          rather than checks out. Hidden once JS applies quantities on change.
+        {%- endcomment -%}
+        <button class="cart__update" type="submit" name="update" data-cart-update>{{ 'cart.update' | t }}</button>
+
+        {%- for discount in cart.cart_level_discount_applications -%}
+          <p class="cart__summary-row cart__summary-row--discount">
+            <span>{{ discount.title }}</span>
+            <span>−{{ discount.total_allocated_amount | money_without_trailing_zeros }}</span>
+          </p>
+        {%- endfor -%}
+
+        <p class="cart__summary-row cart__subtotal">
+          <span>Subtotal</span>
+          <span>{{ cart.total_price | money_without_trailing_zeros }}</span>
+        </p>
+
+        <p class="cart__tax">
+          {%- if cart.taxes_included -%}
+            Taxes included. Shipping calculated at checkout.
+          {%- else -%}
+            Taxes and shipping calculated at checkout.
+          {%- endif -%}
+        </p>
+
+        <button class="cart__checkout" type="submit" name="checkout">{{ 'cart.checkout' | t }}</button>
+      </div>
+    </form>
+  {%- else -%}
+    <div class="cart__empty">
+      <p class="cart__empty-text">Your cart is empty.</p>
+      <a class="cart__continue" href="{{ routes.all_products_collection_url }}">Continue shopping</a>
+    </div>
+  {%- endif -%}
+</div>
+
+{% stylesheet %}
+  .cart {
+    --cart-rule: color-mix(in srgb, var(--color-foreground) 22%, transparent);
+    --cart-line: color-mix(in srgb, var(--color-foreground) 50%, transparent);
+    --cart-quiet: color-mix(in srgb, var(--color-foreground) 62%, var(--color-background));
+    --cart-plate: color-mix(in srgb, var(--color-background) 80%, var(--color-foreground));
+    --cart-gutter: 64px;
+    /* image · product · quantity · total · remove */
+    --cart-cols: 150px minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) 5rem;
+    --cart-gap: 2rem;
+
+    padding: 0.5rem var(--cart-gutter) clamp(4rem, 10vh, 7rem);
+    color: var(--color-foreground);
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .cart__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .cart :is(a, button, input):focus-visible {
+    outline: 1px solid var(--color-foreground);
+    outline-offset: 3px;
+  }
+
+  /* --- Heading ---------------------------------------------------------- */
+
+  .cart__head {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .cart__title {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .cart__count {
+    margin: 0;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--cart-quiet);
+  }
+
+  /* --- Line items: one grid shared by the labels and every row ------------ */
+
+  .cart__cols,
+  .cart__item {
+    display: grid;
+    grid-template-columns: var(--cart-cols);
+    grid-template-areas: 'image info qty total remove';
+    column-gap: var(--cart-gap);
+  }
+
+  .cart__cols {
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--cart-line);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--cart-quiet);
+  }
+
+  .cart__col-label--product { grid-column: image / info; }
+  .cart__col-label--qty { grid-area: qty; }
+  .cart__col-label--total { grid-area: total; }
+
+  .cart__items {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .cart__item {
+    align-items: start;
+    padding: 1.5rem 0;
+    border-bottom: 1px solid var(--cart-rule);
+  }
+
+  .cart__image {
+    grid-area: image;
+    display: block;
+    background-color: var(--cart-plate);
+  }
+
+  /* Natural proportions: garments are never cropped. */
+  .cart__image img,
+  .cart__placeholder {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .cart__placeholder {
+    aspect-ratio: 2 / 3;
+    fill: var(--cart-quiet);
+  }
+
+  .cart__info {
+    grid-area: info;
+    display: grid;
+    gap: 0.35rem;
+    align-content: start;
+    min-width: 0;
+  }
+
+  .cart__name {
+    font-size: 16px;
+    line-height: 1.3;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .cart__name:hover {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+  }
+
+  .cart__meta {
+    display: grid;
+    gap: 0.15rem;
+    margin: 0.25rem 0 0;
+  }
+
+  .cart__meta-row {
+    display: flex;
+    gap: 0.75em;
+    font-size: 13px;
+  }
+
+  .cart__meta dt {
+    min-width: 3.5em;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--cart-quiet);
+  }
+
+  .cart__meta dd {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Shopify's own message when it refuses a quantity, shown on that line. */
+  .cart__line-msg {
+    margin: 0.25rem 0 0;
+    font-size: 12px;
+    color: var(--color-foreground);
+  }
+
+  .cart__unit,
+  .cart__note {
+    margin: 0;
+    font-size: 13px;
+    color: var(--cart-quiet);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Quantity: − number + on one hairline, 44px targets without a box. */
+  .cart__qty {
+    grid-area: qty;
+    display: inline-grid;
+    grid-template-columns: 44px 2.75rem 44px;
+    align-items: center;
+    justify-self: start;
+    /* Sit the numeral on the product name's line, not below it. */
+    margin-top: -0.75rem;
+    border-bottom: 1px solid var(--cart-line);
+  }
+
+  .cart__qty-btn {
+    height: 44px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .cart__qty-btn:hover {
+    color: var(--color-foreground);
+    background-color: color-mix(in srgb, var(--color-foreground) 8%, transparent);
+  }
+
+  .cart__qty-input {
+    width: 100%;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: inherit;
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+
+  .cart__qty-input::-webkit-inner-spin-button,
+  .cart__qty-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  /* The steppers need JS; without it the number is typed and applied with Update. */
+  .cart:not(.is-enhanced) .cart__qty-btn {
+    visibility: hidden;
+  }
+
+  .cart__total {
+    grid-area: total;
+    display: grid;
+    gap: 0.15rem;
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.3;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cart__was {
+    font-size: 13px;
+    color: var(--cart-quiet);
+  }
+
+  .cart__remove {
+    grid-area: remove;
+    justify-self: end;
+    /* 44px target around a small label. */
+    margin: -0.8rem 0 0;
+    padding: 0.8rem 0;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--cart-quiet);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+  }
+
+  .cart__remove:hover {
+    color: var(--color-foreground);
+  }
+
+  /* --- Summary and checkout ---------------------------------------------- */
+
+  .cart__summary {
+    display: grid;
+    grid-template-columns: var(--cart-cols);
+    column-gap: var(--cart-gap);
+    padding-top: 1.25rem;
+  }
+
+  .cart__summary > * {
+    grid-column: 1 / -1;
+  }
+
+  .cart__update {
+    justify-self: start;
+    min-height: 44px;
+    margin-bottom: 1rem;
+    padding: 0 1rem;
+    border: 1px solid var(--cart-line);
+    border-radius: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .cart.is-enhanced .cart__update {
+    display: none;
+  }
+
+  /* Label under the product column, figure under the Total column, so the
+     summary reads as the table's last row. */
+  .cart__summary-row {
+    display: grid;
+    grid-template-columns: subgrid;
+    margin: 0;
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Numeric lines: the summary shares the columns but not the named areas. */
+  .cart__summary-row > :first-child {
+    grid-column: 1 / 3;
+  }
+
+  .cart__summary-row > :last-child {
+    grid-column: 4 / 5;
+  }
+
+  .cart__summary-row--discount {
+    color: var(--cart-quiet);
+    margin-bottom: 0.5rem;
+  }
+
+  .cart__subtotal {
+    font-size: 18px;
+    letter-spacing: 0.06em;
+  }
+
+  .cart__tax {
+    margin: 0.4rem 0 1.5rem;
+    font-size: 12px;
+    color: var(--cart-quiet);
+  }
+
+  /* The page's one assertive element: a full-width inverted bar. */
+  .cart__checkout {
+    width: 100%;
+    height: 60px;
+    padding: 0 1rem;
+    border: 1px solid var(--color-foreground);
+    border-radius: 0;
+    background-color: var(--color-foreground);
+    color: var(--color-background);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background-color 150ms ease;
+  }
+
+  .cart__checkout:hover {
+    background-color: color-mix(in srgb, var(--color-foreground) 86%, var(--color-background));
+  }
+
+  .cart__checkout:active {
+    transform: translateY(1px);
+  }
+
+  /* --- Empty ------------------------------------------------------------- */
+
+  .cart__empty {
+    display: grid;
+    justify-items: start;
+    gap: 1.5rem;
+    padding: 2.5rem 0 4rem;
+    border-top: 1px solid var(--cart-line);
+  }
+
+  .cart__empty-text {
+    margin: 0;
+    font-size: 16px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .cart__continue {
+    display: grid;
+    place-items: center;
+    width: min(100%, 22rem);
+    height: 56px;
+    border: 1px solid var(--color-foreground);
+    font-size: 14px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: inherit;
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+
+  .cart__continue:hover {
+    background-color: var(--color-foreground);
+    color: var(--color-background);
+  }
+
+  /* --- Tablet and phone: each item stacks beside its image ----------------- */
+
+  @media (max-width: 899px) {
+    .cart {
+      --cart-cols: 120px minmax(0, 1fr) auto;
+      --cart-gap: 1.25rem;
+    }
+
+    .cart__cols {
+      grid-template-areas: 'product product product';
+    }
+
+    .cart__col-label--qty,
+    .cart__col-label--total {
+      display: none;
+    }
+
+    .cart__col-label--product {
+      grid-column: 1 / -1;
+    }
+
+    .cart__item {
+      grid-template-areas:
+        'image info info'
+        'image qty total'
+        'image remove remove';
+      row-gap: 0.75rem;
+    }
+
+    .cart__qty {
+      margin-top: 0.25rem;
+    }
+
+    .cart__total {
+      align-self: center;
+      justify-items: end;
+      text-align: right;
+    }
+
+    .cart__remove {
+      justify-self: start;
+      margin: -0.5rem 0 -0.8rem;
+    }
+
+    .cart__summary-row > :first-child {
+      grid-column: 1 / 3;
+    }
+
+    .cart__summary-row > :last-child {
+      grid-column: 3;
+      text-align: right;
+    }
+  }
+
+  @media (max-width: 700px) {
+    /* Matches the header's own 20px inset at this width. */
+    .cart {
+      --cart-gutter: 20px;
+      --cart-cols: 96px minmax(0, 1fr) auto;
+      --cart-gap: 1rem;
+    }
+
+    .cart__head {
+      margin-bottom: 1.25rem;
+    }
+
+    .cart__title {
+      font-size: 18px;
+    }
+
+    .cart__name {
+      font-size: 14px;
+    }
+
+    .cart__item {
+      padding: 1.25rem 0;
+    }
+
+    .cart__subtotal {
+      font-size: 16px;
+    }
+
+    .cart__checkout {
+      height: 56px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cart *,
+    .cart *::before,
+    .cart *::after {
+      transition-duration: 1ms !important;
+    }
+  }
+{% endstylesheet %}
+
+{% javascript %}
+  (function () {
+    'use strict';
+
+    // Carries Shopify's message and the shopper's focus across the reload that
+    // follows a change.
+    var FLASH = 'cart:flash';
+
+    function readFlash() {
+      try {
+        var raw = sessionStorage.getItem(FLASH);
+        sessionStorage.removeItem(FLASH);
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function writeFlash(flash) {
+      try {
+        sessionStorage.setItem(FLASH, JSON.stringify(flash));
+      } catch (e) {
+        /* storage unavailable: the reload still shows the correct cart */
+      }
+    }
+
+    function postJSON(url, body) {
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(body)
+      });
+    }
+
+    // With JS, each quantity change goes to /cart/change.js for its own line
+    // (by line key), which validates inventory; the updates[] form remains the
+    // no-JS path and the fallback if the request itself fails.
+    function init(root) {
+      if (root.dataset.cartReady === 'true') return;
+      var form = root.querySelector('[data-cart-form]');
+      var update = root.querySelector('[data-cart-update]');
+      if (!form || !update) return;
+      root.dataset.cartReady = 'true';
+      root.classList.add('is-enhanced');
+
+      var live = root.querySelector('[data-cart-live]');
+      var changeUrl = root.dataset.changeUrl + '.js';
+      var cartUrl = root.dataset.cartUrl + '.js';
+      var busy = false;
+
+      function lineFor(key) {
+        var lines = root.querySelectorAll('[data-cart-line]');
+        for (var i = 0; i < lines.length; i++) {
+          if (lines[i].dataset.cartLine === key) return lines[i];
+        }
+        return null;
+      }
+
+      function showMessage(line, text) {
+        if (!line || !text) return;
+        var info = line.querySelector('.cart__info');
+        var msg = info.querySelector('.cart__line-msg');
+        if (!msg) {
+          msg = document.createElement('p');
+          msg.className = 'cart__line-msg';
+          info.appendChild(msg);
+        }
+        msg.textContent = text;
+        if (live) live.textContent = text;
+      }
+
+      function control(line, which) {
+        if (!line) return null;
+        if (which === 'input') return line.querySelector('[data-cart-qty]');
+        return line.querySelector(which === 'minus' ? '[data-cart-step^="-"]' : '[data-cart-step]:not([data-cart-step^="-"])');
+      }
+
+      function reload(flash) {
+        writeFlash(flash);
+        window.location.reload();
+      }
+
+      function change(line, quantity, which) {
+        if (busy) return;
+        busy = true;
+        line.setAttribute('aria-busy', 'true');
+        var key = line.dataset.cartLine;
+        var input = line.querySelector('[data-cart-qty]');
+        var shown = Number(input.defaultValue);
+
+        postJSON(changeUrl, { id: key, quantity: quantity })
+          .then(function (response) {
+            if (response.ok) return reload({ key: key, focus: which });
+            return response.json().then(function (error) {
+              var message = error.description || error.message;
+              // A refused change may still have been capped, so ask Shopify
+              // what this line now holds rather than assuming.
+              return fetch(cartUrl, { headers: { Accept: 'application/json' } })
+                .then(function (r) { return r.json(); })
+                .then(function (cart) {
+                  var item = cart.items.filter(function (i) { return i.key === key; })[0];
+                  var kept = item ? item.quantity : 0;
+                  if (kept !== shown) return reload({ key: key, focus: which, message: message });
+                  input.value = shown;
+                  busy = false;
+                  line.removeAttribute('aria-busy');
+                  showMessage(line, message);
+                });
+            });
+          })
+          .catch(function () {
+            // Network or parse failure: fall back to the standard form update.
+            input.value = quantity;
+            if (form.requestSubmit) form.requestSubmit(update);
+            else update.click();
+          });
+      }
+
+      root.querySelectorAll('[data-cart-step]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          var line = button.closest('[data-cart-line]');
+          var input = line.querySelector('[data-cart-qty]');
+          var step = Number(button.dataset.cartStep) || 0;
+          var next = Math.max(0, (Number(input.value) || 0) + step);
+          // Merchant quantity rule only; stock limits are Shopify's to enforce.
+          if (input.max && next > Number(input.max)) next = Number(input.max);
+          input.value = next;
+          change(line, next, step < 0 ? 'minus' : 'plus');
+        });
+      });
+
+      root.querySelectorAll('[data-cart-qty]').forEach(function (input) {
+        function commit() {
+          var next = Math.max(0, Math.floor(Number(input.value)) || 0);
+          if (next === Number(input.defaultValue)) return;
+          change(input.closest('[data-cart-line]'), next, 'input');
+        }
+        input.addEventListener('change', commit);
+        input.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            commit();
+          }
+        });
+      });
+
+      // After a reload: return focus to the control that was used, and show
+      // Shopify's message on that line if there was one.
+      var flash = readFlash();
+      if (flash) {
+        var line = lineFor(flash.key);
+        var target = control(line, flash.focus);
+        if (target) target.focus({ preventScroll: false });
+        if (flash.message) {
+          // Let the live region settle before filling it so it is announced.
+          setTimeout(function () { showMessage(line, flash.message); }, 150);
+        }
+      }
+    }
+
+    function initAll(scope) {
+      (scope || document).querySelectorAll('[data-cart]').forEach(init);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () { initAll(); });
+    } else {
+      initAll();
+    }
+
+    document.addEventListener('shopify:section:load', function (event) {
+      initAll(event.target);
+    });
+  })();
+{% endjavascript %}
 
 {% schema %}
 {
