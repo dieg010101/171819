@@ -18,3 +18,10 @@
     aria-label="Enter seventeeneighteennineteen"
   ></button>
 </div>
+
+{%- comment -%} Only JS can take the overlay down, so without JS it must never cover the page. {%- endcomment -%}
+<noscript>
+  <style>
+    .flock-intro { display: none; }
+  </style>
+</noscript>

@@ -2466,6 +2466,9 @@ function updateHover() {
 }
 
 function keyPressed() {
+  // Authoring shortcuts only: p5 listens on window, so in production any
+  // visitor keypress would reach them.
+  if (!CONFIG.debug) return;
   if (key === "r" || key === "R") resetToIdle();
   else if (key === "d" || key === "D") {
     debugOn = !debugOn;

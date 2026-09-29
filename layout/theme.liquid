@@ -27,6 +27,8 @@
   </head>
 
   <body>
+    <a class="skip-link" href="#MainContent" data-skip-link>Skip to content</a>
+
     {% comment %}
       Flock intro: homepage only, and never in the theme editor, where a full-page
       overlay would block merchants from selecting and editing sections.
@@ -45,7 +47,9 @@
 
     {% sections 'header-group' %}
 
-    {{ content_for_layout }}
+    <main id="MainContent" tabindex="-1">
+      {{ content_for_layout }}
+    </main>
 
     {% sections 'footer-group' %}
   </body>

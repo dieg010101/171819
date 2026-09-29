@@ -78,6 +78,41 @@ body {
   color: var(--color-foreground);
 }
 
+/* Sections keep the flex-column context they had as direct children of <body>,
+   so section rules written against it (e.g. the cover flow's height) still hold. */
+main {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Focused only as the skip link's target; the ring would outline the whole page. */
+main:focus {
+  outline: none;
+}
+
+/* Hidden until focused, then shown in the header's link voice. */
+.skip-link {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 10000;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-size: 16px;
+  line-height: 30px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  text-decoration: none;
+  translate: 0 calc(-100% - 1rem);
+}
+
+.skip-link:focus {
+  translate: 0 0;
+  outline: 1px solid var(--color-foreground);
+  outline-offset: 4px;
+}
+
 /** Section layout utilities */
 
 /**

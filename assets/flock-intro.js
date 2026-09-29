@@ -16,22 +16,37 @@
 
   var SCROLL_LOCK_CLASS = "flock-intro-lock";
 
-  // Storefront content is rendered as sibling section wrappers (header, main,
-  // footer). Inerting those isolates the page from keyboard and pointer input
-  // without touching <body>, <html>, or the intro's own trigger.
-  var PAGE_SELECTOR = "body > .shopify-section";
-
   var done = false;
   var inerted = []; // only the elements this integration actually changed
 
+  // The theme's own page: skip link, header/footer section groups, and <main>
+  // (see layout/theme.liquid). Inerting those isolates it from keyboard and
+  // pointer input without touching <body>, <html>, the intro's own trigger, or
+  // UI that Shopify/apps inject into <body> (e.g. a consent banner), which must
+  // stay operable.
+  var PAGE_SELECTOR = "body > [data-skip-link], body > .shopify-section, body > main";
+
   function isolatePage() {
-    var sections = document.querySelectorAll(PAGE_SELECTOR);
-    for (var i = 0; i < sections.length; i++) {
+    var parts = document.querySelectorAll(PAGE_SELECTOR);
+    for (var i = 0; i < parts.length; i++) {
       // Already inert for some other reason: leave it, and do not claim it.
-      if (sections[i].inert) continue;
-      sections[i].inert = true;
-      inerted.push(sections[i]);
+      if (parts[i].inert) continue;
+      parts[i].inert = true;
+      inerted.push(parts[i]);
     }
+  }
+
+  // Stop p5 for good once the overlay is gone: its window listeners (keys,
+  // pointer, resize) otherwise outlive the canvas. Deferred because dismiss()
+  // can run inside the engine's own finishing frame, which still calls p5
+  // globals after dispatching its completion event.
+  function teardownEngine() {
+    setTimeout(function () {
+      var p5 = window.p5;
+      if (p5 && p5.instance && typeof p5.instance.remove === "function") {
+        p5.instance.remove();
+      }
+    }, 0);
   }
 
   // The single cleanup path for every dismissal route: completion, boot timeout,
@@ -43,6 +58,7 @@
     inerted.length = 0;
     document.documentElement.classList.remove(SCROLL_LOCK_CLASS);
     root.remove();
+    teardownEngine();
   }
 
   // p5 is up: drop the CSS charcoal fallback so canvas transparency can reveal

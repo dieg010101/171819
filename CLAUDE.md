@@ -80,4 +80,4 @@ After code changes:
 the animation without being asked). `assets/flock-intro.js` is the small DOM adapter.
 The canvas renders transparently over the real homepage; the engine dispatches
 `flocktransition:complete` and the adapter removes the overlay. `assets/p5.min.js` is
-vendored p5 2.3.3.
+vendored p5 2.3.1.
