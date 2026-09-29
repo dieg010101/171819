@@ -1,47 +1,989 @@
 {% comment %}
-  This section is used in the collection template to render collection page
-  listing all products within a collection.
+  Collection / shop index: category menu, a one-line utility bar (count ·
+  filter · sort), then an image-led product grid with Shopify pagination.
+
+  Everything is server-rendered: products come from `collection.products`
+  inside `paginate`, sorting and filtering are a plain GET form using
+  Shopify's own `sort_by` and filter parameters, and pagination links are
+  Shopify's. JavaScript only auto-submits that form, toggles the filter panel,
+  and loads a product's second image the first time it is hovered.
 
   https://shopify.dev/docs/storefronts/themes/architecture/templates/collection
 {% endcomment %}
 
-<h1>{{ collection.title }}</h1>
+{%- liquid
+  assign menu = section.settings.category_menu
+  assign sort_by = collection.sort_by | default: collection.default_sort_by
 
-<div class="collection-products">
-  {% paginate collection.products by 20 %}
-    {% for product in collection.products %}
-      <div class="collection-product">
-        {% if product.featured_image %}
-          {% render 'image',
-            class: 'collection-product__image',
-            image: product.featured_image,
-            url: product.url,
-            width: 400,
-            height: 400,
-            crop: 'center'
-          %}
-        {% endif %}
-        <div class="collection-product__content">
-          <p>{{ product.title | escape | link_to: product.url }}</p>
-          <p>{{ product.price | money }}</p>
-        </div>
+  assign active_filter_count = 0
+  for filter in collection.filters
+    if filter.type == 'price_range'
+      if filter.min_value.value != nil or filter.max_value.value != nil
+        assign active_filter_count = active_filter_count | plus: 1
+      endif
+    else
+      assign active_filter_count = active_filter_count | plus: filter.active_values.size
+    endif
+  endfor
+-%}
+
+<div class="shop full-width" data-shop>
+  {%- paginate collection.products by 24 -%}
+    <div class="shop__bar">
+      {%- if menu != blank and menu.links.size > 0 -%}
+        {%- comment -%} The menu shows where you are; the page still needs its heading. {%- endcomment -%}
+        <h1 class="shop__sr">{{ collection.title }}</h1>
+        <nav class="shop__cats" aria-label="Shop categories">
+          <ul class="shop__cats-list">
+            {%- for link in menu.links -%}
+              <li>
+                <a
+                  class="shop__cat"
+                  href="{{ link.url }}"
+                  {% if link.current %}
+                    aria-current="page"
+                  {% endif %}
+                >
+                  {{- link.title -}}
+                </a>
+              </li>
+            {%- endfor -%}
+          </ul>
+        </nav>
+      {%- else -%}
+        {%- comment -%} No category menu chosen: name the current collection instead of inventing links. {%- endcomment -%}
+        <h1 class="shop__current">{{ collection.title }}</h1>
+      {%- endif -%}
+
+      <form
+        class="shop__tools"
+        id="ShopFacets-{{ section.id }}"
+        action="{{ collection.url }}"
+        method="get"
+        data-shop-form
+      >
+        <p class="shop__count">
+          {{ collection.products_count }}
+          {% if collection.products_count == 1 %}product{% else %}products{% endif %}
+        </p>
+
+        {%- if collection.filters.size > 0 -%}
+          <button
+            class="shop__tool shop__filter-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="ShopFilters-{{ section.id }}"
+            data-shop-filter-toggle
+          >
+            Filter
+            {%- if active_filter_count > 0 %} ({{ active_filter_count }}){% endif -%}
+          </button>
+        {%- endif -%}
+
+        {%- if collection.sort_options.size > 0 -%}
+          <div class="shop__sort">
+            <label class="shop__tool-label" for="SortBy-{{ section.id }}">Sort</label>
+            <select class="shop__select" id="SortBy-{{ section.id }}" name="sort_by" data-shop-auto>
+              {%- for option in collection.sort_options -%}
+                <option value="{{ option.value | escape }}" {% if option.value == sort_by %}selected{% endif %}>
+                  {{- option.name | escape -}}
+                </option>
+              {%- endfor -%}
+            </select>
+            <noscript><button class="shop__tool" type="submit">Apply</button></noscript>
+          </div>
+        {%- endif -%}
+
+        {%- if collection.filters.size > 0 -%}
+          <div class="shop__filters" id="ShopFilters-{{ section.id }}" hidden data-shop-filters>
+            {%- for filter in collection.filters -%}
+              <fieldset class="shop__facet">
+                <legend class="shop__facet-label">{{ filter.label | escape }}</legend>
+
+                {%- case filter.type -%}
+                  {%- when 'price_range' -%}
+                    <div class="shop__range">
+                      <label class="shop__range-field">
+                        <span class="shop__sr">Minimum price</span>
+                        <span aria-hidden="true">{{ cart.currency.symbol }}</span>
+                        <input
+                          class="shop__range-input"
+                          type="number"
+                          name="{{ filter.min_value.param_name }}"
+                          {% if filter.min_value.value != nil %}
+                            value="{{ filter.min_value.value | money_without_currency | replace: ',', '' }}"
+                          {% endif %}
+                          placeholder="0"
+                          min="0"
+                          max="{{ filter.range_max | money_without_currency | replace: ',', '' }}"
+                          inputmode="decimal"
+                          data-shop-auto
+                        >
+                      </label>
+                      <span class="shop__range-sep" aria-hidden="true">–</span>
+                      <label class="shop__range-field">
+                        <span class="shop__sr">Maximum price</span>
+                        <span aria-hidden="true">{{ cart.currency.symbol }}</span>
+                        <input
+                          class="shop__range-input"
+                          type="number"
+                          name="{{ filter.max_value.param_name }}"
+                          {% if filter.max_value.value != nil %}
+                            value="{{ filter.max_value.value | money_without_currency | replace: ',', '' }}"
+                          {% endif %}
+                          placeholder="{{ filter.range_max | money_without_currency | replace: ',', '' }}"
+                          min="0"
+                          max="{{ filter.range_max | money_without_currency | replace: ',', '' }}"
+                          inputmode="decimal"
+                          data-shop-auto
+                        >
+                      </label>
+                    </div>
+                  {%- else -%}
+                    {%- comment -%} list and boolean filters, including availability, variant options and metafields. {%- endcomment -%}
+                    <ul class="shop__values">
+                      {%- for value in filter.values -%}
+                        <li>
+                          <label class="shop__value{% if value.count == 0 and value.active == false %} is-empty{% endif %}">
+                            <input
+                              type="checkbox"
+                              name="{{ value.param_name }}"
+                              value="{{ value.value }}"
+                              {% if value.active %}
+                                checked
+                              {% endif %}
+                              {% if value.count == 0 and value.active == false %}
+                                disabled
+                              {% endif %}
+                              data-shop-auto
+                            >
+                            <span>{{ value.label | escape }}</span>
+                            <span class="shop__value-count">{{ value.count }}</span>
+                          </label>
+                        </li>
+                      {%- endfor -%}
+                    </ul>
+                {%- endcase -%}
+              </fieldset>
+            {%- endfor -%}
+            <noscript><button class="shop__tool shop__apply" type="submit">Apply</button></noscript>
+          </div>
+        {%- endif -%}
+      </form>
+
+      {%- if active_filter_count > 0 -%}
+        <ul class="shop__active" aria-label="Active filters">
+          {%- for filter in collection.filters -%}
+            {%- if filter.type == 'price_range' -%}
+              {%- if filter.min_value.value != nil or filter.max_value.value != nil -%}
+                <li>
+                  <a class="shop__chip" href="{{ filter.url_to_remove }}">
+                    {{ filter.min_value.value | default: 0 | money_without_trailing_zeros }}–{{ filter.max_value.value | default: filter.range_max | money_without_trailing_zeros }}
+                    <span class="shop__sr">Remove filter</span><span aria-hidden="true"> ×</span>
+                  </a>
+                </li>
+              {%- endif -%}
+            {%- else -%}
+              {%- for value in filter.active_values -%}
+                <li>
+                  <a class="shop__chip" href="{{ value.url_to_remove }}">
+                    {{ filter.label | escape }}: {{ value.label | escape }}
+                    <span class="shop__sr">Remove filter</span><span aria-hidden="true"> ×</span>
+                  </a>
+                </li>
+              {%- endfor -%}
+            {%- endif -%}
+          {%- endfor -%}
+          <li>
+            <a class="shop__chip shop__chip--clear" href="{{ collection.url }}?sort_by={{ sort_by }}">Clear all</a>
+          </li>
+        </ul>
+      {%- endif -%}
+    </div>
+
+    {%- if collection.description != blank -%}
+      <div class="shop__description">{{ collection.description }}</div>
+    {%- endif -%}
+
+    {%- if collection.products.size > 0 -%}
+      <ul class="shop__grid">
+        {%- for product in collection.products -%}
+          {%- liquid
+            # Roughly the first row at the widest layout is above the fold.
+            assign loading = 'lazy'
+            if forloop.index <= 5
+              assign loading = 'eager'
+            endif
+
+            assign primary = product.featured_media.preview_image
+            assign secondary = nil
+            for media in product.media offset: 1
+              if media.preview_image
+                assign secondary = media.preview_image
+                break
+              endif
+            endfor
+          -%}
+          <li class="shop__item">
+            <a class="shop__link" href="{{ product.url }}" data-shop-link>
+              <div class="shop__media">
+                {%- if primary -%}
+                  {{
+                    primary
+                    | image_url: width: 960
+                    | image_tag:
+                      class: 'shop__img',
+                      widths: '240, 360, 480, 640, 800, 960',
+                      sizes: '(min-width: 1880px) calc((100vw - 128px) / 5), (min-width: 1100px) calc((100vw - 128px) / 4), (min-width: 701px) calc((100vw - 128px) / 3), calc((100vw - 40px) / 2)',
+                      loading: loading,
+                      alt: primary.alt | default: product.title
+                  }}
+                {%- else -%}
+                  {{ 'product-apparel-1' | placeholder_svg_tag: 'shop__img shop__placeholder' }}
+                {%- endif -%}
+
+                {%- if secondary -%}
+                  {%- comment -%} Inert until first hovered on a fine pointer, so it costs nothing otherwise. {%- endcomment -%}
+                  <template data-shop-alt>
+                    {{
+                      secondary
+                      | image_url: width: 960
+                      | image_tag:
+                        class: 'shop__img shop__img--alt',
+                        widths: '240, 360, 480, 640, 800, 960',
+                        sizes: '(min-width: 1880px) calc((100vw - 128px) / 5), (min-width: 1100px) calc((100vw - 128px) / 4), (min-width: 701px) calc((100vw - 128px) / 3), calc((100vw - 40px) / 2)',
+                        alt: ''
+                    }}
+                  </template>
+                {%- endif -%}
+              </div>
+
+              <div class="shop__meta">
+                <p class="shop__title">{{ product.title | escape }}</p>
+                <p class="shop__price">
+                  {%- if product.compare_at_price > product.price -%}
+                    <span class="shop__sr">Sale price</span>
+                  {%- endif -%}
+                  {%- if product.price_varies -%}
+                    {{ product.price_min | money_without_trailing_zeros }}–{{ product.price_max | money_without_trailing_zeros }}
+                  {%- else -%}
+                    {{ product.price | money_without_trailing_zeros }}
+                  {%- endif -%}
+                  {%- if product.compare_at_price > product.price -%}
+                    <s class="shop__was">
+                      <span class="shop__sr">Regular price</span>
+                      {{ product.compare_at_price | money_without_trailing_zeros }}
+                    </s>
+                  {%- endif -%}
+                  {%- unless product.available -%}
+                    <span class="shop__soldout">Sold out</span>
+                  {%- endunless -%}
+                </p>
+              </div>
+            </a>
+          </li>
+        {%- endfor -%}
+      </ul>
+    {%- else -%}
+      <div class="shop__empty">
+        {%- if active_filter_count > 0 -%}
+          <p>No products match these filters.</p>
+          <a class="shop__chip" href="{{ collection.url }}?sort_by={{ sort_by }}">Clear filters</a>
+        {%- else -%}
+          <p>No products.</p>
+        {%- endif -%}
       </div>
-    {% endfor %}
+    {%- endif -%}
 
-    {{ paginate | default_pagination }}
-  {% endpaginate %}
+    {%- if paginate.pages > 1 -%}
+      <nav class="shop__pages" aria-label="Pagination">
+        {%- if paginate.previous -%}
+          <a class="shop__page shop__page--step" href="{{ paginate.previous.url }}">Previous</a>
+        {%- endif -%}
+        <ol class="shop__page-list">
+          {%- for part in paginate.parts -%}
+            <li>
+              {%- if part.is_link -%}
+                <a class="shop__page" href="{{ part.url }}">{{ part.title }}</a>
+              {%- elsif part.title == paginate.current_page -%}
+                <span class="shop__page" aria-current="page">{{ part.title }}</span>
+              {%- else -%}
+                <span class="shop__page shop__page--gap">{{ part.title }}</span>
+              {%- endif -%}
+            </li>
+          {%- endfor -%}
+        </ol>
+        {%- if paginate.next -%}
+          <a class="shop__page shop__page--step" href="{{ paginate.next.url }}">Next</a>
+        {%- endif -%}
+      </nav>
+    {%- endif -%}
+  {%- endpaginate -%}
 </div>
 
+{%- comment -%} Without JS the filter panel simply stays open and the toggle, which needs JS, is hidden. {%- endcomment -%}
+<noscript>
+  <style>
+    .shop .shop__filters[hidden] { display: grid; }
+    .shop .shop__filter-toggle { display: none; }
+  </style>
+</noscript>
+
 {% stylesheet %}
-  .collection-products {
+  .shop {
+    --shop-quiet: color-mix(in srgb, var(--color-foreground) 62%, var(--color-background));
+    --shop-rule: color-mix(in srgb, var(--color-foreground) 22%, transparent);
+    /* Same outer inset as the header, so the grid hangs from SHOP and CART. */
+    --shop-gutter: 64px;
+    --shop-cols: 4;
+
+    padding: 0.25rem var(--shop-gutter) clamp(4rem, 10vh, 7rem);
+    color: var(--color-foreground);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .shop__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .shop :is(a, button, select, input):focus-visible {
+    outline: 1px solid var(--color-foreground);
+    outline-offset: 3px;
+  }
+
+  /* --- Utility bar: categories left, count · filter · sort right ------------ */
+
+  .shop__bar {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    grid-template-areas:
+      'nav count filter sort'
+      'panel panel panel panel'
+      'active active active active';
+    align-items: center;
+    column-gap: 1.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .shop__cats,
+  .shop__current {
+    grid-area: nav;
+    min-width: 0;
+  }
+
+  /* One hairline under the utility row ties categories and tools into a
+     single strip across the grid's width. */
+  @media (min-width: 701px) {
+    .shop__bar::before {
+      content: '';
+      grid-area: 1 / 1 / 2 / -1;
+      align-self: stretch;
+      border-bottom: 1px solid var(--shop-rule);
+      pointer-events: none;
+    }
+
+    /* The strip's hairline already heads the open filter panel. */
+    .shop__bar .shop__filters {
+      margin-top: 0;
+      border-top: 0;
+    }
+  }
+
+  .shop__cats-list {
+    display: flex;
+    gap: 1.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    /* Scrolls sideways on narrow screens rather than wrapping into a block. */
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .shop__cats-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .shop__cat,
+  .shop__current {
+    display: block;
+    margin: 0;
+    padding: 0.85rem 0;
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .shop__cat {
+    color: var(--shop-quiet);
+    text-decoration: none;
+  }
+
+  .shop__cat:hover,
+  .shop__cat[aria-current='page'] {
+    color: var(--color-foreground);
+  }
+
+  .shop__cat[aria-current='page'] {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 5px;
+  }
+
+  /* The form's controls join the bar's grid directly. */
+  .shop__tools {
+    display: contents;
+  }
+
+  .shop__count {
+    grid-area: count;
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .shop__filter-toggle {
+    grid-area: filter;
+  }
+
+  .shop__sort {
+    grid-area: sort;
+  }
+
+  .shop__count,
+  .shop__tool,
+  .shop__tool-label,
+  .shop__select {
+    font-size: 11px;
+    line-height: 1.2;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--shop-quiet);
+  }
+
+  .shop__tool {
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .shop__tool:hover,
+  .shop__filter-toggle[aria-expanded='true'] {
+    color: var(--color-foreground);
+  }
+
+  .shop__sort {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+  }
+
+  .shop__select {
+    min-height: 44px;
+    padding: 0 1.1em 0 0;
+    border: 0;
+    border-radius: 0;
+    background-color: transparent;
+    /* A hairline caret instead of the platform chevron. */
+    background-image:
+      linear-gradient(45deg, transparent 50%, currentcolor 50%),
+      linear-gradient(135deg, currentcolor 50%, transparent 50%);
+    background-position:
+      calc(100% - 5px) 50%,
+      100% 50%;
+    background-size: 5px 5px;
+    background-repeat: no-repeat;
+    color: var(--color-foreground);
+    font-family: inherit;
+    cursor: pointer;
+    appearance: none;
+    field-sizing: content;
+  }
+
+  .shop__select option {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    text-transform: none;
+  }
+
+  /* --- Filter panel: columns of plain checkboxes ---------------------------- */
+
+  .shop__filters {
+    grid-area: panel;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    gap: 1.25rem 2rem;
+    margin-top: 0.5rem;
+    padding: 1.25rem 0 1.5rem;
+    border-top: 1px solid var(--shop-rule);
+    border-bottom: 1px solid var(--shop-rule);
+  }
+
+  .shop__filters[hidden] {
+    display: none;
+  }
+
+  .shop__facet {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .shop__facet-label {
+    margin-bottom: 0.5rem;
+    padding: 0;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--shop-quiet);
+  }
+
+  .shop__values {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .shop__value {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-height: 32px;
+    cursor: pointer;
+  }
+
+  .shop__value input {
+    width: 13px;
+    height: 13px;
+    margin: 0;
+    accent-color: var(--color-foreground);
+  }
+
+  .shop__value-count {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+    color: var(--shop-quiet);
+  }
+
+  .shop__value.is-empty {
+    color: var(--shop-quiet);
+    cursor: default;
+  }
+
+  .shop__range {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .shop__range-field {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-bottom: 1px solid var(--shop-rule);
+  }
+
+  .shop__range-input {
+    width: 4.5rem;
+    min-height: 36px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: inherit;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .shop__apply {
+    justify-self: start;
+    color: var(--color-foreground);
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  /* --- Active filters -------------------------------------------------------- */
+
+  .shop__active {
+    grid-area: active;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 1.25rem;
+    margin: 0.25rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .shop__chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-foreground);
+    text-decoration: none;
+  }
+
+  .shop__chip:hover,
+  .shop__chip--clear {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+  }
+
+  .shop__chip--clear {
+    color: var(--shop-quiet);
+  }
+
+  .shop__description {
+    max-width: 40em;
+    margin: -0.5rem 0 1.75rem;
+    color: var(--shop-quiet);
+  }
+
+  .shop__description > * + * {
+    margin-top: 0.6em;
+  }
+
+  /* --- Grid ------------------------------------------------------------------ */
+
+  .shop__grid {
+    display: grid;
+    grid-template-columns: repeat(var(--shop-cols), minmax(0, 1fr));
+    column-gap: clamp(0.5rem, 1vw, 1rem);
+    row-gap: clamp(2rem, 3.5vw, 3.5rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .shop__link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* A flat 3:4 field; photographs are contained, never cropped. */
+  .shop__media {
+    position: relative;
+    aspect-ratio: 3 / 4;
+  }
+
+  .shop__img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .shop__placeholder {
+    fill: var(--shop-quiet);
+  }
+
+  .shop__img--alt {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 200ms ease;
+  }
+
+  /* Only real hover devices swap images; touch never does. */
+  @media (hover: hover) and (pointer: fine) {
+    .shop__link:is(:hover, :focus-visible) .shop__img--alt.is-loaded {
+      opacity: 1;
+    }
+  }
+
+  .shop__meta {
+    display: grid;
+    gap: 0.15rem;
+    padding-top: 0.6rem;
+  }
+
+  .shop__title,
+  .shop__price {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .shop__title {
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .shop__link:hover .shop__title {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  .shop__price {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 0.6em;
+    font-variant-numeric: tabular-nums;
+    color: var(--shop-quiet);
+  }
+
+  .shop__was {
+    color: var(--shop-quiet);
+  }
+
+  .shop__soldout {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-foreground);
+  }
+
+  /* --- Empty and pagination -------------------------------------------------- */
+
+  .shop__empty {
+    display: grid;
+    justify-items: start;
+    gap: 0.75rem;
+    padding: 3rem 0;
+    border-top: 1px solid var(--shop-rule);
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .shop__empty p {
+    margin: 0;
+  }
+
+  .shop__pages {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1.5rem;
+    margin-top: clamp(3rem, 6vw, 5rem);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .shop__page-list {
+    display: flex;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .shop__page {
+    display: grid;
+    place-items: center;
+    min-width: 44px;
+    min-height: 44px;
+    color: var(--shop-quiet);
+    text-decoration: none;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .shop__page:hover,
+  .shop__page[aria-current='page'] {
+    color: var(--color-foreground);
+  }
+
+  .shop__page[aria-current='page'] {
+    text-decoration: underline;
+    text-underline-offset: 5px;
+  }
+
+  .shop__page--step {
+    min-width: 0;
+  }
+
+  /* --- Columns ---------------------------------------------------------------- */
+
+  /* Five columns only where each photograph still stays larger than at 1440. */
+  @media (min-width: 1880px) {
+    .shop {
+      --shop-cols: 5;
+    }
+  }
+
+  @media (max-width: 1099px) {
+    .shop {
+      --shop-cols: 3;
+    }
+  }
+
+  @media (max-width: 700px) {
+    /* Matches the header's own 20px inset at this width. */
+    .shop {
+      --shop-gutter: 20px;
+      --shop-cols: 2;
+    }
+
+    /* Count joins the category row; filter and sort share the row below. */
+    .shop__bar {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        'nav count'
+        'filter sort'
+        'panel panel'
+        'active active';
+      column-gap: 1.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .shop__count {
+      justify-self: end;
+    }
+
+    .shop__filter-toggle {
+      justify-self: start;
+    }
+
+    .shop__sort {
+      justify-self: end;
+      min-width: 0;
+    }
+
+    .shop__filters {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1.25rem 1rem;
+    }
+
+    .shop__value {
+      min-height: 44px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shop__img--alt {
+      transition-duration: 1ms;
+    }
   }
 {% endstylesheet %}
+
+{% javascript %}
+  (function () {
+    'use strict';
+
+    var OPEN = 'shop:filters-open';
+
+    function init(root) {
+      if (root.dataset.shopReady === 'true') return;
+      root.dataset.shopReady = 'true';
+
+      var form = root.querySelector('[data-shop-form]');
+      var toggle = root.querySelector('[data-shop-filter-toggle]');
+      var panel = root.querySelector('[data-shop-filters]');
+
+      function setOpen(open) {
+        if (!toggle || !panel) return;
+        panel.hidden = !open;
+        toggle.setAttribute('aria-expanded', String(open));
+      }
+
+      if (toggle) {
+        toggle.addEventListener('click', function () {
+          setOpen(panel.hidden);
+        });
+      }
+
+      // Reopen the panel after a filter change reloaded the page.
+      try {
+        if (sessionStorage.getItem(OPEN) === '1') setOpen(true);
+        sessionStorage.removeItem(OPEN);
+      } catch (e) {
+        /* storage unavailable: the panel just starts closed */
+      }
+
+      // Submit the same GET the form would, minus empty fields, so Shopify gets
+      // clean sort_by / filter parameters.
+      function apply(fromPanel) {
+        var params = new URLSearchParams();
+        new FormData(form).forEach(function (value, key) {
+          if (value !== '') params.append(key, value);
+        });
+        if (fromPanel) {
+          try { sessionStorage.setItem(OPEN, '1'); } catch (e) { /* ignore */ }
+        }
+        var query = params.toString();
+        window.location.assign(form.action + (query ? '?' + query : ''));
+      }
+
+      if (form) {
+        form.addEventListener('change', function (event) {
+          if (!event.target.matches('[data-shop-auto]')) return;
+          apply(panel ? panel.contains(event.target) : false);
+        });
+        form.addEventListener('submit', function (event) {
+          event.preventDefault();
+          apply(false);
+        });
+      }
+
+      // Second image: inserted from its inert template on first hover/focus,
+      // only where a fine pointer can hover.
+      var canHover = window.matchMedia('(hover: hover) and (pointer: fine)');
+      root.querySelectorAll('[data-shop-link]').forEach(function (link) {
+        var template = link.querySelector('template[data-shop-alt]');
+        if (!template) return;
+
+        function load() {
+          if (!canHover.matches || !template.parentNode) return;
+          var img = template.content.firstElementChild.cloneNode(true);
+          img.setAttribute('aria-hidden', 'true');
+          img.addEventListener('load', function () { img.classList.add('is-loaded'); });
+          template.replaceWith(img);
+          if (img.complete && img.naturalWidth) img.classList.add('is-loaded');
+        }
+
+        link.addEventListener('pointerenter', load);
+        link.addEventListener('focus', load);
+      });
+    }
+
+    function initAll(scope) {
+      (scope || document).querySelectorAll('[data-shop]').forEach(init);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () { initAll(); });
+    } else {
+      initAll();
+    }
+
+    document.addEventListener('shopify:section:load', function (event) {
+      initAll(event.target);
+    });
+  })();
+{% endjavascript %}
 
 {% schema %}
 {
   "name": "t:general.collection",
-  "settings": []
+  "settings": [
+    {
+      "type": "link_list",
+      "id": "category_menu",
+      "label": "Shop categories",
+      "info": "Links shown above the product grid, e.g. All, Tops, Bottoms."
+    }
+  ]
 }
 {% endschema %}
