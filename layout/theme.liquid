@@ -17,6 +17,11 @@
       {{ settings.type_primary_font | font_url | preload_tag: as: 'font', crossorigin: 'anonymous' }}
     {% endunless %}
 
+    {% # The header's SHOP / CART are set in the secondary font on every page. %}
+    {% unless settings.type_secondary_font.system? %}
+      {{ settings.type_secondary_font | font_url | preload_tag: as: 'font', crossorigin: 'anonymous' }}
+    {% endunless %}
+
     {% # Load and preload the critical CSS %}
     {{ 'critical.css' | asset_url | stylesheet_tag: preload: true }}
 

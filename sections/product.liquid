@@ -1,5 +1,5 @@
 {% comment %}
-  Product detail page: thumbnail rail · primary media plate · product information.
+  Product detail page: a column of product media · product information.
 
   Everything commerce-critical is server-rendered. The form is a plain Shopify
   product form posting to /cart/add; its `name="id"` <select> is the source of
@@ -20,111 +20,111 @@
     assign active_media = current_variant.featured_media
   endif
 
-  # The plate takes the proportions of the first media so switching images
-  # never resizes it; other media are contained within that field.
-  assign plate_ratio = 0.6667
-  if product.featured_media
-    assign plate_ratio = product.featured_media.preview_image.aspect_ratio | default: 0.6667
-  endif
-
   assign form_id = 'ProductForm-' | append: section.id
   assign status_label = 'Available'
   if current_variant.available == false
     assign status_label = 'Sold out'
   endif
 
-  assign has_policies = false
-  if shop.shipping_policy != blank or shop.refund_policy != blank
-    assign has_policies = true
+  # Size guide seam. The guide is structured product data, normalised to the
+  # shape snippets/product-size-guide.liquid documents: the unit the values are
+  # authored in, column labels (independent of the variant options), measurement
+  # names, and a flat row-by-row list of values.
+  #
+  # Priority: 1. real structured data (no source is connected yet, so these
+  # start empty); 2. the design-preview sample, only when the section's
+  # "preview_size_guide" setting is on AND there is no real data; 3. nothing,
+  # in which case the Size Guide control is not rendered.
+  assign size_guide_unit = 'cm'
+  assign size_guide_sizes = '' | split: ','
+  assign size_guide_rows = '' | split: ','
+  assign size_guide_values = '' | split: ','
+  assign size_guide_note = ''
+
+  assign has_size_guide = false
+  if size_guide_sizes.size > 0 and size_guide_rows.size > 0
+    assign has_size_guide = true
+  endif
+
+  # TEMPORARY, design preview only: the Figma's example measurements, so the
+  # Size Guide can be seen in the theme editor before real data exists. Never
+  # product data, and never shown over real data. Remove with the setting once
+  # the structured source is connected.
+  if has_size_guide == false and section.settings.preview_size_guide
+    assign size_guide_unit = 'cm'
+    assign size_guide_sizes = 'S,M,L,XL,XXL' | split: ','
+    assign size_guide_rows = 'Length,Waist,Thigh,Leg Opening,Front Rise,Back Rise' | split: ','
+    assign sample_row = '70,71.5,73,74.5,76' | split: ','
+    assign size_guide_values = sample_row
+    for row in (2..6)
+      assign size_guide_values = size_guide_values | concat: sample_row
+    endfor
+    assign size_guide_note = 'Measurements taken with garment laid flat.'
+    assign has_size_guide = true
   endif
 -%}
 
-<div
-  class="pdp full-width"
-  style="--pdp-ratio: {{ plate_ratio }};"
-  data-pdp
->
+<div class="pdp full-width" data-pdp>
   <div class="pdp__grid">
-    {%- comment -%} Media: one set of slides; CSS decides between a stacked plate (desktop) and a swipeable scroll-snap track (tablet/phone). {%- endcomment -%}
-    <div class="pdp__media{% if media_count < 2 %} pdp__media--single{% endif %}">
-      <div class="pdp__plate">
-        <ul class="pdp__slides" data-pdp-slides>
-          {%- for media in product.media -%}
-            {%- liquid
-              assign is_active = false
-              if media.id == active_media.id
-                assign is_active = true
-              endif
-              assign alt = media.alt | default: product.title
-            -%}
-            <li
-              class="pdp__slide{% if is_active %} is-active{% endif %}"
-              id="PdpMedia-{{ section.id }}-{{ media.id }}"
-              data-pdp-slide
-              data-media-id="{{ media.id }}"
-              aria-label="{{ forloop.index }} of {{ media_count }}"
-            >
-              {%- case media.media_type -%}
-                {%- when 'video' -%}
-                  {{ media | video_tag: image_size: '1400x', controls: true, class: 'pdp__media-el' }}
-                {%- when 'external_video' -%}
-                  {{ media | external_video_tag: class: 'pdp__media-el' }}
-                {%- else -%}
-                  {%- comment -%} Images, and the preview image of 3D models (this theme has no model viewer). {%- endcomment -%}
-                  {%- liquid
-                    assign loading = 'lazy'
-                    assign priority = 'auto'
-                    if is_active
-                      assign loading = 'eager'
-                      assign priority = 'high'
-                    endif
-                  -%}
-                  {{
-                    media.preview_image
-                    | image_url: width: 1400
-                    | image_tag:
-                      class: 'pdp__media-el',
-                      widths: '360, 480, 640, 800, 960, 1100, 1400',
-                      sizes: '(min-width: 1024px) 30vw, calc(100vw - 40px)',
-                      loading: loading,
-                      fetchpriority: priority,
-                      alt: alt
-                  }}
-              {%- endcase -%}
-            </li>
-          {%- else -%}
-            <li class="pdp__slide is-active" data-pdp-slide>
-              {{ 'product-apparel-1' | placeholder_svg_tag: 'pdp__media-el pdp__placeholder' }}
-            </li>
-          {%- endfor -%}
-        </ul>
-      </div>
-
-      {%- if media_count > 1 -%}
-        <ol class="pdp__thumbs" aria-label="Product media">
-          {%- for media in product.media -%}
-            <li>
-              <button
-                class="pdp__thumb"
-                type="button"
-                data-pdp-thumb
-                data-index="{{ forloop.index0 }}"
-                aria-controls="PdpMedia-{{ section.id }}-{{ media.id }}"
-                aria-label="Show {% if media.media_type == 'image' %}image{% else %}media{% endif %} {{ forloop.index }} of {{ media_count }}"
-                {% if media.id == active_media.id %}
-                  aria-current="true"
-                {% endif %}
-              >
+    {%- comment -%} Media: one list of slides; CSS decides between a vertical column (desktop) and a swipeable scroll-snap track (phone). {%- endcomment -%}
+    <div class="pdp__media">
+      <ul class="pdp__slides" data-pdp-slides aria-label="Product media">
+        {%- for media in product.media -%}
+          {%- liquid
+            assign is_active = false
+            if media.id == active_media.id
+              assign is_active = true
+            endif
+            assign alt = media.alt | default: product.title
+          -%}
+          <li
+            class="pdp__slide{% if is_active %} is-active{% endif %}"
+            data-pdp-slide
+            data-media-id="{{ media.id }}"
+            aria-label="{{ forloop.index }} of {{ media_count }}"
+          >
+            {%- case media.media_type -%}
+              {%- when 'video' -%}
+                {{ media | video_tag: image_size: '1400x', controls: true, class: 'pdp__media-el' }}
+              {%- when 'external_video' -%}
+                {{ media | external_video_tag: class: 'pdp__media-el' }}
+              {%- else -%}
+                {%- comment -%}
+                  Images, and the preview image of 3D models (this theme has no model viewer).
+                  The first media leads the desktop column and the active one leads the phone track,
+                  so both load eagerly.
+                {%- endcomment -%}
+                {%- liquid
+                  assign loading = 'lazy'
+                  assign priority = 'auto'
+                  if forloop.first or is_active
+                    assign loading = 'eager'
+                  endif
+                  if forloop.first
+                    assign priority = 'high'
+                  endif
+                -%}
                 {{
                   media.preview_image
-                  | image_url: width: 240
-                  | image_tag: widths: '80, 120, 160, 240', sizes: '(min-width: 1024px) 6vw, 56px', loading: 'lazy', alt: ''
+                  | image_url: width: 1600
+                  | image_tag:
+                    class: 'pdp__media-el',
+                    widths: '400, 560, 720, 900, 1100, 1300, 1600',
+                    sizes: '(min-width: 768px) 46vw, calc(100vw - 40px)',
+                    loading: loading,
+                    fetchpriority: priority,
+                    alt: alt
                 }}
-              </button>
-            </li>
-          {%- endfor -%}
-        </ol>
+            {%- endcase -%}
+          </li>
+        {%- else -%}
+          <li class="pdp__slide is-active" data-pdp-slide>
+            {{ 'product-apparel-1' | placeholder_svg_tag: 'pdp__media-el pdp__placeholder' }}
+          </li>
+        {%- endfor -%}
+      </ul>
 
+      {%- if media_count > 1 -%}
         <p class="pdp__index" aria-hidden="true">
           <span data-pdp-index>
             {%- for media in product.media -%}
@@ -140,16 +140,40 @@
     <div class="pdp__info">
       <h1 class="pdp__title">{{ product.title }}</h1>
 
-      <p class="pdp__price">
-        <span class="pdp__sr" data-pdp-price-label>
-          {%- if current_variant.compare_at_price > current_variant.price -%}Sale price{%- else -%}Price{%- endif -%}
-        </span>
-        <span data-pdp-price>{{ current_variant.price | money_without_trailing_zeros }}</span>
-        <s class="pdp__compare" data-pdp-compare {% unless current_variant.compare_at_price > current_variant.price %}hidden{% endunless %}>
-          <span class="pdp__sr">Regular price</span>
-          <span data-pdp-compare-value>{{ current_variant.compare_at_price | money_without_trailing_zeros }}</span>
-        </s>
-      </p>
+      <div class="pdp__buy-row">
+        <p class="pdp__price">
+          <span class="pdp__sr" data-pdp-price-label>
+            {%- if current_variant.compare_at_price > current_variant.price -%}Sale price{%- else -%}Price{%- endif -%}
+          </span>
+          <span data-pdp-price>{{ current_variant.price | money_with_currency }}</span>
+          <s class="pdp__compare" data-pdp-compare {% unless current_variant.compare_at_price > current_variant.price %}hidden{% endunless %}>
+            <span class="pdp__sr">Regular price</span>
+            <span data-pdp-compare-value>{{ current_variant.compare_at_price | money }}</span>
+          </s>
+        </p>
+
+        {%- comment -%} Lives beside the price, outside the form; `form` still submits it with the product form. {%- endcomment -%}
+        <div class="pdp__qty">
+          <label class="pdp__qty-label" for="Quantity-{{ section.id }}">Quantity</label>
+          <input
+            class="pdp__qty-input"
+            type="number"
+            id="Quantity-{{ section.id }}"
+            name="quantity"
+            form="{{ form_id }}"
+            min="1"
+            value="1"
+            inputmode="numeric"
+            data-pdp-qty-input
+          >
+          <button class="pdp__qty-btn" type="button" data-pdp-qty="-1" aria-label="Decrease quantity">
+            <span aria-hidden="true">-</span>
+          </button>
+          <button class="pdp__qty-btn" type="button" data-pdp-qty="1" aria-label="Increase quantity">
+            <span aria-hidden="true">+</span>
+          </button>
+        </div>
+      </div>
       {%- comment -%} Availability is carried by the button and the option states; this keeps it in text for assistive tech. {%- endcomment -%}
       <p class="pdp__sr" data-pdp-status>{{ status_label }}</p>
 
@@ -157,8 +181,8 @@
         <div class="pdp__options">
           {%- for option in product.options_with_values -%}
             {%- assign option_index = forloop.index0 -%}
-            <fieldset class="pdp__row pdp__option" data-pdp-option>
-              <legend class="pdp__row-label">{{ option.name }}</legend>
+            <fieldset class="pdp__option" data-pdp-option>
+              <legend class="pdp__sr">{{ option.name }}</legend>
               <div class="pdp__values">
                 {%- for value in option.values -%}
                   {%- liquid
@@ -188,18 +212,14 @@
                   </label>
                 {%- endfor -%}
               </div>
-              {%- comment -%}
-                Size guide hook: a link belongs here, beside the size values, once
-                products carry a size guide (e.g. a page-reference metafield).
-              {%- endcomment -%}
             </fieldset>
           {%- endfor -%}
         </div>
       {%- endunless -%}
 
       {%- form 'product', product, id: form_id, class: 'pdp__form' -%}
-        <div class="pdp__row pdp__variant-fallback{% if product.has_only_default_variant %} pdp__variant-fallback--default{% endif %}">
-          <label class="pdp__row-label" for="Variant-{{ section.id }}">Option</label>
+        <div class="pdp__variant-fallback{% if product.has_only_default_variant %} pdp__variant-fallback--default{% endif %}">
+          <label class="pdp__sr" for="Variant-{{ section.id }}">{{ product.options.first | default: 'Option' }}</label>
           <select class="pdp__select" id="Variant-{{ section.id }}" name="id" data-pdp-variant-select>
             {%- for variant in product.variants -%}
               <option
@@ -211,33 +231,11 @@
                   disabled
                 {% endunless %}
               >
-                {{ variant.title }} — {{ variant.price | money_without_trailing_zeros }}
+                {{ variant.title }} — {{ variant.price | money_with_currency }}
                 {%- unless variant.available %} (sold out){% endunless -%}
               </option>
             {%- endfor -%}
           </select>
-        </div>
-
-        <div class="pdp__row pdp__qty-row">
-          <label class="pdp__row-label" for="Quantity-{{ section.id }}">Qty</label>
-          <div class="pdp__qty">
-            <button class="pdp__qty-btn" type="button" data-pdp-qty="-1" aria-label="Decrease quantity">
-              <span aria-hidden="true">−</span>
-            </button>
-            <input
-              class="pdp__qty-input"
-              type="number"
-              id="Quantity-{{ section.id }}"
-              name="quantity"
-              min="1"
-              value="1"
-              inputmode="numeric"
-              data-pdp-qty-input
-            >
-            <button class="pdp__qty-btn" type="button" data-pdp-qty="1" aria-label="Increase quantity">
-              <span aria-hidden="true">+</span>
-            </button>
-          </div>
         </div>
 
         <button
@@ -245,56 +243,74 @@
           type="submit"
           name="add"
           data-pdp-submit
-          data-label-add="Add to cart"
+          data-label-add="Add to Cart"
           data-label-soldout="Sold out"
           data-label-unavailable="Unavailable"
           {% unless current_variant.available %}
             disabled
           {% endunless %}
         >
-          {%- if current_variant.available -%}Add to cart{%- else -%}Sold out{%- endif -%}
+          {%- if current_variant.available -%}Add to Cart{%- else -%}Sold out{%- endif -%}
         </button>
 
-        <div class="pdp__dynamic" data-pdp-dynamic {% unless current_variant.available %}hidden{% endunless %}>
-          {{ form | payment_button }}
-        </div>
+        {%- if section.settings.show_dynamic_checkout -%}
+          <div class="pdp__dynamic" data-pdp-dynamic {% unless current_variant.available %}hidden{% endunless %}>
+            {{ form | payment_button }}
+          </div>
+        {%- endif -%}
       {%- endform -%}
 
       {%- comment -%} Variant changes are announced once, here, rather than from every updated node. {%- endcomment -%}
       <p class="pdp__sr" aria-live="polite" data-pdp-live></p>
 
       {%- comment -%}
-        Disclosures appear only when Shopify has content for them. A DETAILS
-        row belongs between these two once products carry structured details
-        (materials, care, fit) as metafields.
+        Two disclosures share one slot under their row, so only one is open at a
+        time. Each appears only when Shopify has content for it.
       {%- endcomment -%}
-      {%- if product.description != blank or has_policies -%}
-        <div class="pdp__notes">
-          {%- if product.description != blank -%}
-            <details class="pdp__disclosure">
-              <summary class="pdp__summary">
-                <span>Description</span>
-                <span class="pdp__summary-icon" aria-hidden="true"></span>
-              </summary>
-              <div class="pdp__prose">{{ product.description }}</div>
-            </details>
-          {%- endif -%}
+      {%- if product.description != blank or has_size_guide -%}
+        <div class="pdp__notes" data-pdp-notes>
+          <div class="pdp__toggles">
+            {%- if product.description != blank -%}
+              <button
+                class="pdp__toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="PdpDescription-{{ section.id }}"
+                data-pdp-toggle
+              >
+                <span>Item Description</span>
+                <span class="pdp__toggle-icon" aria-hidden="true"></span>
+              </button>
+            {%- endif -%}
+            {%- if has_size_guide -%}
+              <button
+                class="pdp__toggle pdp__toggle--end"
+                type="button"
+                aria-expanded="false"
+                aria-controls="PdpSizeGuide-{{ section.id }}"
+                data-pdp-toggle
+              >
+                <span>Size Guide</span>
+                <span class="pdp__toggle-icon" aria-hidden="true"></span>
+              </button>
+            {%- endif -%}
+          </div>
 
-          {%- if has_policies -%}
-            <details class="pdp__disclosure">
-              <summary class="pdp__summary">
-                <span>Shipping</span>
-                <span class="pdp__summary-icon" aria-hidden="true"></span>
-              </summary>
-              <ul class="pdp__prose pdp__links">
-                {%- if shop.shipping_policy != blank -%}
-                  <li><a href="{{ shop.shipping_policy.url }}">{{ shop.shipping_policy.title }}</a></li>
-                {%- endif -%}
-                {%- if shop.refund_policy != blank -%}
-                  <li><a href="{{ shop.refund_policy.url }}">{{ shop.refund_policy.title }}</a></li>
-                {%- endif -%}
-              </ul>
-            </details>
+          {%- if product.description != blank -%}
+            <div class="pdp__panel pdp__prose" id="PdpDescription-{{ section.id }}" data-pdp-panel hidden>
+              {{ product.description }}
+            </div>
+          {%- endif -%}
+          {%- if has_size_guide -%}
+            <div class="pdp__panel pdp__panel--size-guide" id="PdpSizeGuide-{{ section.id }}" data-pdp-panel hidden>
+              {%- render 'product-size-guide',
+                unit: size_guide_unit,
+                sizes: size_guide_sizes,
+                rows: size_guide_rows,
+                values: size_guide_values,
+                note: size_guide_note
+              -%}
+            </div>
           {%- endif -%}
         </div>
       {%- endif -%}
@@ -310,8 +326,8 @@
           "title": {{ variant.title | json }},
           "options": {{ variant.options | json }},
           "available": {{ variant.available | json }},
-          "price": {{ variant.price | money_without_trailing_zeros | json }},
-          "compare": {% if variant.compare_at_price > variant.price %}{{ variant.compare_at_price | money_without_trailing_zeros | json }}{% else %}null{% endif %},
+          "price": {{ variant.price | money_with_currency | json }},
+          "compare": {% if variant.compare_at_price > variant.price %}{{ variant.compare_at_price | money | json }}{% else %}null{% endif %},
           "media": {{ variant.featured_media.id | json }}
         }{% unless forloop.last %},{% endunless %}
       {%- endfor -%}
@@ -319,39 +335,47 @@
   </script>
 </div>
 
-{%- comment -%} Without JS the option buttons cannot change the submitted variant, so the native select takes their place, and all media is reachable by scrolling. {%- endcomment -%}
+{%- comment -%} Without JS the option buttons cannot change the submitted variant, so the native select takes their place, all media is reachable by scrolling, and the disclosures are simply open. {%- endcomment -%}
 <noscript>
   <style>
     .pdp .pdp__options,
-    .pdp .pdp__thumbs,
     .pdp .pdp__index,
-    .pdp .pdp__qty-btn { display: none; }
-    .pdp .pdp__variant-fallback:not(.pdp__variant-fallback--default) { display: grid; }
-    .pdp .pdp__slides { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; }
-    .pdp .pdp__slide { flex: 0 0 100%; opacity: 1; visibility: visible; }
+    .pdp .pdp__qty-btn,
+    .pdp .pdp__toggle-icon { display: none; }
+    .pdp .pdp__variant-fallback:not(.pdp__variant-fallback--default) { display: block; }
+    .pdp .pdp__panel[hidden] { display: block; }
   </style>
 </noscript>
 
 {% stylesheet %}
+  /*
+    Geometry is derived from the 1280px Figma frame (64px gutters, a 554px media
+    column, 125px of air, a 472px information column) and expressed as
+    proportions so the same composition holds at other widths.
+  */
   .pdp {
-    --pdp-rule: color-mix(in srgb, var(--color-foreground) 26%, transparent);
-    --pdp-line: color-mix(in srgb, var(--color-foreground) 55%, transparent);
-    --pdp-quiet: color-mix(in srgb, var(--color-foreground) 55%, var(--color-background));
-    --pdp-plate: color-mix(in srgb, var(--color-background) 80%, var(--color-foreground));
-    --pdp-gutter: 64px;
-    --pdp-label-w: 3.75rem;
-    --pdp-box: 52px;
+    --pdp-ink: #fff;
+    --pdp-quiet: color-mix(in srgb, var(--pdp-ink) 42%, transparent);
+    /* The Figma's 0.15px white rules, as they actually render on #1b1b1b. */
+    --pdp-hairline: color-mix(in srgb, var(--pdp-ink) 24%, transparent);
+    /* 554 × 615: the media frame in the Figma. */
+    --pdp-frame: 554 / 615;
+    --pdp-line: 30px;
     --pdp-ease: 200ms ease;
 
-    padding: 0.5rem var(--pdp-gutter) clamp(4rem, 10vh, 7rem);
-    color: var(--color-foreground);
-    font-size: 14px;
-    line-height: 1.5;
+    /* With the header's 158px, puts the media top at the Figma's y = 168. The
+       space below belongs to the site footer (--site-footer-gap). The gutter
+       matches the header's inset, as on the collection and cart pages. */
+    padding: 10px var(--split-gutter) 0;
+    color: var(--pdp-ink);
+    font-family: var(--font-secondary--family);
+    font-size: 11px;
+    line-height: var(--pdp-line);
   }
 
   .pdp__grid {
     display: grid;
-    row-gap: 2rem;
+    row-gap: 1.5rem;
   }
 
   .pdp__sr {
@@ -366,32 +390,19 @@
     border: 0;
   }
 
-  .pdp :is(a, button, summary, select, input):focus-visible,
+  .pdp :is(a, button, select, input):focus-visible,
   .pdp__value-input:focus-visible + .pdp__value {
-    outline: 1px solid var(--color-foreground);
-    outline-offset: 3px;
+    outline: 1px solid var(--pdp-ink);
+    outline-offset: 2px;
   }
 
   /* --- Media --------------------------------------------------------------- */
 
   .pdp__media {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      'plate plate'
-      'thumbs index';
-    column-gap: 1rem;
-    row-gap: 0.75rem;
-    align-items: start;
     min-width: 0;
   }
 
-  .pdp__plate {
-    grid-area: plate;
-    background-color: var(--pdp-plate);
-  }
-
-  /* Tablet/phone: a native horizontal scroll-snap track. */
+  /* Phone: a native horizontal scroll-snap track. */
   .pdp__slides {
     display: flex;
     margin: 0;
@@ -409,8 +420,7 @@
 
   .pdp__slide {
     flex: 0 0 100%;
-    aspect-ratio: var(--pdp-ratio);
-    max-height: 64svh;
+    aspect-ratio: var(--pdp-frame);
     scroll-snap-align: start;
   }
 
@@ -418,8 +428,8 @@
     display: block;
     width: 100%;
     height: 100%;
-    /* Garments are never cropped; off-ratio media sits within the plate. */
-    object-fit: contain;
+    /* The design fills the frame edge to edge, so off-ratio media is cropped. */
+    object-fit: cover;
     border: 0;
   }
 
@@ -427,46 +437,10 @@
     fill: var(--pdp-quiet);
   }
 
-  .pdp__thumbs {
-    grid-area: thumbs;
-    display: flex;
-    gap: 0.5rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .pdp__thumb {
-    display: block;
-    width: 44px;
-    padding: 0;
-    border: 0;
-    background: none;
-    cursor: pointer;
-    opacity: 0.55;
-    transition: opacity var(--pdp-ease);
-  }
-
-  .pdp__thumb img {
-    width: 100%;
-    height: auto;
-    aspect-ratio: var(--pdp-ratio);
-    object-fit: contain;
-    background-color: var(--pdp-plate);
-  }
-
-  .pdp__thumb:hover,
-  .pdp__thumb[aria-current='true'] {
-    opacity: 1;
-  }
-
   .pdp__index {
-    grid-area: index;
-    margin: 0;
-    font-size: 11px;
-    letter-spacing: 0.1em;
+    margin: 0.5rem 0 0;
+    font-size: 10px;
+    line-height: 12px;
     font-variant-numeric: tabular-nums;
     color: var(--pdp-quiet);
   }
@@ -481,185 +455,46 @@
     min-width: 0;
   }
 
-  /* Title and price: one light, open-tracked voice at two sizes. */
   .pdp__title {
     margin: 0;
-    font-size: clamp(22px, 2.2vw, 30px);
-    font-weight: 400;
-    line-height: 1.15;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font: inherit;
+    letter-spacing: -0.05em;
+  }
+
+  .pdp__buy-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    column-gap: 1.5rem;
   }
 
   .pdp__price {
-    margin: 0.55em 0 0;
-    font-size: clamp(20px, 2vw, 28px);
-    line-height: 1.15;
-    letter-spacing: 0.06em;
-    font-variant-numeric: tabular-nums;
+    margin: 0;
   }
 
   .pdp__compare {
-    margin-left: 0.4em;
-    font-size: 0.6em;
+    margin-left: 0.6em;
     color: var(--pdp-quiet);
   }
 
-  .pdp__options {
-    display: grid;
-    gap: 1rem;
-    margin-top: 2.25rem;
+  /* Quantity · 1 · - · +, set as text; the spacing follows the Figma. */
+  .pdp__qty {
+    display: flex;
+    align-items: baseline;
   }
 
-  /* Label beside controls; SIZE and QTY share the label width so their boxes
-     start on the same edge. */
-  .pdp__row {
-    display: grid;
-    grid-template-columns: var(--pdp-label-w) minmax(0, 1fr);
-    align-items: start;
-    column-gap: 1.5rem;
-    min-width: 0;
-    margin: 0;
+  .pdp__qty-input {
+    width: 20px;
+    margin: 0 30px;
     padding: 0;
     border: 0;
-  }
-
-  /* Floated, the legend becomes an ordinary grid item in the label column. */
-  .pdp__row-label {
-    float: left;
-    padding: 0;
-    /* Centred on the first line of boxes, even when the values wrap. */
-    line-height: var(--pdp-box);
-    font-size: 16px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
-  .pdp__values {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.8rem;
-  }
-
-  .pdp__value-input {
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .pdp__value {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: var(--pdp-box);
-    height: var(--pdp-box);
-    border: 1px solid var(--pdp-line);
-    font-size: 15px;
-    letter-spacing: 0.04em;
-    font-variant-numeric: tabular-nums;
-    cursor: pointer;
-    transition:
-      border-color var(--pdp-ease),
-      background-color var(--pdp-ease),
-      color var(--pdp-ease);
-  }
-
-  .pdp__value:hover {
-    border-color: var(--color-foreground);
-  }
-
-  .pdp__value-input:checked + .pdp__value {
-    border-color: var(--color-foreground);
-    background-color: var(--color-foreground);
-    color: var(--color-background);
-  }
-
-  /* Sold out: still selectable (so its state can be read), with a hairline
-     slash rather than hidden. */
-  .pdp__value[data-state='soldout'] {
-    border-color: var(--pdp-rule);
-    color: var(--pdp-quiet);
-    background-image: linear-gradient(
-      to top right,
-      transparent calc(50% - 0.5px),
-      currentcolor calc(50% - 0.5px),
-      currentcolor calc(50% + 0.5px),
-      transparent calc(50% + 0.5px)
-    );
-  }
-
-  .pdp__value-input:checked + .pdp__value[data-state='soldout'] {
-    border-color: var(--pdp-quiet);
-    background-color: var(--pdp-quiet);
-    color: var(--color-background);
-  }
-
-  /* No variant exists for this combination. */
-  .pdp__value[data-state='unavailable'] {
-    border-style: dashed;
-    border-color: var(--pdp-rule);
-    color: var(--pdp-quiet);
-  }
-
-  .pdp__form {
-    display: grid;
-    gap: 1rem;
-    margin-top: 1rem;
-  }
-
-  .pdp__variant-fallback {
-    display: none;
-  }
-
-  .pdp__select {
-    min-height: 52px;
-    width: 100%;
-    padding: 0 0.75rem;
-    border: 1px solid var(--pdp-line);
-    border-radius: 0;
-    color: inherit;
-    font-size: 15px;
-  }
-
-  /* Quantity in the same box language as the sizes. */
-  .pdp__qty {
-    display: inline-grid;
-    grid-template-columns: repeat(3, var(--pdp-box));
-    column-gap: 0.8rem;
-    justify-self: start;
-  }
-
-  .pdp__qty-btn,
-  .pdp__qty-input {
-    height: var(--pdp-box);
-    padding: 0;
-    border: 1px solid var(--pdp-line);
     border-radius: 0;
     background: none;
     color: inherit;
-    font: inherit;
-    font-size: 15px;
-    font-variant-numeric: tabular-nums;
+    line-height: inherit;
     text-align: center;
-  }
-
-  .pdp__qty-btn {
-    cursor: pointer;
-    transition: border-color var(--pdp-ease);
-  }
-
-  .pdp__qty-btn:hover:not(:disabled) {
-    border-color: var(--color-foreground);
-  }
-
-  .pdp__qty-btn:disabled {
-    border-color: var(--pdp-rule);
-    color: var(--pdp-quiet);
-    cursor: default;
-  }
-
-  .pdp__qty-input {
+    font-variant-numeric: tabular-nums;
     appearance: textfield;
     -moz-appearance: textfield;
   }
@@ -670,139 +505,249 @@
     margin: 0;
   }
 
-  .pdp__submit {
-    width: 100%;
-    height: 60px;
-    margin-top: 1.25rem;
-    padding: 0 1rem;
-    border: 1px solid var(--color-foreground);
+  .pdp__qty-btn + .pdp__qty-btn {
+    margin-left: 23px;
+  }
+
+  /* Shared by every text-only control: a bare glyph with a larger, invisible
+     hit area that never shifts the layout. */
+  .pdp__qty-btn,
+  .pdp__toggle {
+    position: relative;
+    padding: 0;
+    border: 0;
     border-radius: 0;
-    background-color: transparent;
-    color: var(--color-foreground);
+    background: none;
+    color: inherit;
     font: inherit;
-    font-size: 17px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
     cursor: pointer;
-    transition:
-      background-color var(--pdp-ease),
-      color var(--pdp-ease),
-      transform 120ms ease;
+  }
+
+  .pdp__qty-btn::before,
+  .pdp__toggle::before {
+    content: '';
+    position: absolute;
+    inset: -8px -10px;
+  }
+
+  .pdp__qty-btn[aria-disabled='true'] {
+    cursor: default;
+  }
+
+  /* Sizes: plain figures; the selected one carries a short rule beneath it. */
+  .pdp__option {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .pdp__options {
+    margin-top: 1px;
+  }
+
+  .pdp__values {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: clamp(28px, 3.9vw, 50px);
+  }
+
+  .pdp__value-input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .pdp__value {
+    /* Grow the touch target without moving the figures. */
+    padding: 7px 10px;
+    margin: -7px -10px;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: color var(--pdp-ease);
+  }
+
+  .pdp__value-text {
+    position: relative;
+    display: inline-block;
+  }
+
+  .pdp__value-text::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 1px;
+    height: 1px;
+    background-color: var(--pdp-hairline);
+    opacity: 0;
+    transition: opacity var(--pdp-ease);
+  }
+
+  .pdp__value:hover .pdp__value-text::after {
+    opacity: 0.5;
+  }
+
+  .pdp__value-input:checked + .pdp__value .pdp__value-text::after {
+    opacity: 1;
+  }
+
+  /* Sold out stays selectable (so its state can be read and announced), struck
+     through; a combination with no variant at all is fainter still. */
+  .pdp__value:is([data-state='soldout'], [data-state='unavailable']) {
+    color: var(--pdp-quiet);
+  }
+
+  /* On the figure itself: decorations don't propagate into inline-blocks. */
+  .pdp__value:is([data-state='soldout'], [data-state='unavailable']) .pdp__value-text {
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+  }
+
+  .pdp__value[data-state='unavailable'] {
+    opacity: 0.6;
+  }
+
+  .pdp__form {
+    margin-top: 21px;
+  }
+
+  .pdp__variant-fallback {
+    display: none;
+  }
+
+  .pdp__select {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--pdp-hairline);
+    border-radius: 0;
+    color: inherit;
+  }
+
+  /* The Figma's thin capsule: 19px tall, kept thin on purpose; the hit area
+     is grown invisibly instead. */
+  .pdp__submit {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 19px;
+    padding: 0 1rem;
+    border: 1px solid var(--pdp-hairline);
+    border-radius: 9.5px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    line-height: 12px;
+    letter-spacing: -0.05em;
+    cursor: pointer;
+    transition: border-color var(--pdp-ease), color var(--pdp-ease);
+  }
+
+  .pdp__submit::before {
+    content: '';
+    position: absolute;
+    inset: -12px -1px;
   }
 
   .pdp__submit:hover:not(:disabled) {
-    background-color: var(--color-foreground);
-    color: var(--color-background);
-  }
-
-  .pdp__submit:active:not(:disabled) {
-    transform: translateY(1px);
+    border-color: var(--pdp-ink);
   }
 
   .pdp__submit:disabled {
-    border-color: var(--pdp-rule);
     color: var(--pdp-quiet);
     cursor: not-allowed;
   }
 
-  /* Dynamic checkout stays secondary: a quiet text action under the CTA. */
   .pdp__dynamic {
-    --shopify-accelerated-checkout-button-block-size: 44px;
-    --shopify-accelerated-checkout-button-border-radius: 0px;
-    --shopify-accelerated-checkout-row-gap: 4px;
-  }
-
-  .pdp__dynamic .shopify-payment-button__button {
-    min-height: 44px;
-    border-radius: 0;
-  }
-
-  .pdp__dynamic .shopify-payment-button__button--unbranded {
-    background-color: transparent;
-    color: var(--color-foreground);
-    font-size: 12px;
-    font-weight: 400;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    text-decoration: underline;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 4px;
-  }
-
-  .pdp__dynamic .shopify-payment-button__button--unbranded:hover:not([disabled]) {
-    background-color: transparent;
-    text-decoration-color: transparent;
-  }
-
-  .pdp__dynamic .shopify-payment-button__more-options {
-    color: var(--pdp-quiet);
-    font-size: 11px;
+    margin-top: 12px;
+    --shopify-accelerated-checkout-button-block-size: 32px;
+    --shopify-accelerated-checkout-button-border-radius: 16px;
   }
 
   /* --- Disclosures -------------------------------------------------------- */
 
+  /* One grid for the row and its panels: the toggles sit at either end, and
+     panels can align to them (the size guide's units sit under its toggle). */
   .pdp__notes {
-    margin-top: 1.5rem;
+    display: grid;
+    grid-template-columns: max-content 1fr max-content;
+    margin-top: 17px;
+    font-size: 10px;
+    line-height: 12px;
+    letter-spacing: -0.05em;
   }
 
-  /* Rules sit between rows, not above the first or below the last. */
-  .pdp__disclosure:not(:last-child) {
-    border-bottom: 1px solid var(--pdp-rule);
+  .pdp__toggles {
+    display: contents;
   }
 
-  .pdp__summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 58px;
-    font-size: 16px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    cursor: pointer;
-    list-style: none;
+  .pdp__toggle {
+    display: inline-flex;
+    gap: 56px;
+    letter-spacing: inherit;
   }
 
-  .pdp__summary::-webkit-details-marker {
-    display: none;
+  .pdp__toggle--end {
+    grid-column: 3;
   }
 
-  /* A hairline plus that closes to a minus; the open state itself is exposed
-     natively by <details>. */
-  .pdp__summary-icon {
-    position: relative;
-    width: 13px;
-    height: 13px;
-    margin-right: 0.35rem;
+  /* Text, not iconography: + when closed, - when open, as drawn. The fixed
+     slot keeps the right-hand toggle's label still as the glyph changes. */
+  .pdp__toggle-icon {
+    display: inline-block;
+    width: 5px;
+    text-align: center;
   }
 
-  .pdp__summary-icon::before,
-  .pdp__summary-icon::after {
-    content: '';
-    position: absolute;
-    inset: 6px 0 auto;
-    height: 1px;
-    background-color: currentcolor;
-    transition: transform var(--pdp-ease);
+  .pdp__toggle-icon::before {
+    content: '+';
   }
 
-  .pdp__summary-icon::after {
-    transform: rotate(90deg);
+  .pdp__toggle[aria-expanded='true'] .pdp__toggle-icon::before {
+    content: '-';
   }
 
-  .pdp__disclosure[open] .pdp__summary-icon::after {
-    transform: rotate(0deg);
+  .pdp__panel {
+    grid-column: 1 / -1;
+    min-width: 0;
   }
 
+  /* Description: the full column width, 11/12 like the Figma; Shopify's own
+     paragraphs are separated by two empty lines. */
   .pdp__prose {
-    max-width: 36em;
-    margin: 0;
-    padding-bottom: 1.25rem;
-    color: var(--pdp-quiet);
-    text-wrap: pretty;
+    margin-top: 23px;
+    font-size: 11px;
+    line-height: 12px;
+    letter-spacing: -0.05em;
   }
 
   .pdp__prose > * + * {
-    margin-top: 0.7em;
+    margin-top: 24px;
+  }
+
+  /* Size guide: the units take the toggle's column, so they start under
+     "Size Guide"; the measurements end flush with the column. `hidden` must
+     still win over the display. */
+  .pdp__panel--size-guide:not([hidden]),
+  .pdp__panel--size-guide .size-guide {
+    display: grid;
+    grid-template-columns: subgrid;
+  }
+
+  .pdp__panel--size-guide {
+    margin-top: 14px;
+  }
+
+  .pdp__panel--size-guide .size-guide {
+    grid-column: 1 / -1;
+  }
+
+  .pdp__panel--size-guide .size-guide__units {
+    grid-column: 3;
+    justify-self: start;
+  }
+
+  .pdp__panel--size-guide .size-guide__body {
+    grid-column: 1 / -1;
+    justify-self: end;
   }
 
   .pdp__prose :is(ul, ol) {
@@ -810,128 +755,56 @@
   }
 
   .pdp__prose a {
-    color: var(--color-foreground);
-    text-decoration: underline;
+    color: inherit;
     text-underline-offset: 2px;
   }
 
-  .pdp__links {
-    padding-left: 0;
-    list-style: none;
-  }
+  /* --- Two columns: media · information ------------------------------------ */
 
-  /* --- Desktop: rail · plate · information, as one centred composition ------ */
-
-  @media (min-width: 1024px) {
-    .pdp {
-      --pdp-rail-w: clamp(64px, 6vw, 92px);
-      --pdp-rail-gap: clamp(40px, 4.9vw, 72px);
-      /* Width-led, but never taller than the space under the header. */
-      --pdp-plate-w: min(clamp(320px, 30vw, 480px), calc((100svh - 12rem) * var(--pdp-ratio)));
-      /* Wide enough for five size boxes on one line. */
-      --pdp-info-w: clamp(400px, 32vw, 500px);
-    }
-
+  @media (min-width: 768px) {
     .pdp__grid {
-      grid-template-columns:
-        calc(var(--pdp-rail-w) + var(--pdp-rail-gap) + var(--pdp-plate-w))
-        var(--pdp-info-w);
-      column-gap: clamp(40px, 4.7vw, 72px);
-      justify-content: center;
+      /* 554 : 472 with 125px between them at 1280px; the gap eases down with
+         the viewport so tablet widths keep room for the information column. */
+      grid-template-columns: var(--split-columns);
+      column-gap: var(--split-gap);
       align-items: start;
+      /* Past ~1920px the composition stops widening and centres instead. */
+      max-width: var(--split-max);
+      margin-inline: auto;
     }
 
+    /* The site footer (its own section, after <main>) sits on the information
+       column and should end level with the last media. The media column
+       therefore claims that much less height, so the footer rises beside it;
+       if the information is taller, the footer simply follows it. The media
+       paints above the footer's empty left side. */
     .pdp__media {
-      grid-template-columns: var(--pdp-rail-w) var(--pdp-plate-w);
-      grid-template-areas: 'thumbs plate';
-      column-gap: var(--pdp-rail-gap);
+      position: relative;
+      z-index: 1;
+      margin-bottom: calc(-1 * (var(--site-footer-gap) + var(--site-footer-block)));
     }
 
-    .pdp__media--single {
-      grid-template-areas: '. plate';
-    }
-
-    /* One plate, slides stacked in place; the active one fades in. */
+    /* Desktop: every media in one column, each in the same frame; the next one
+       shows beneath the first at the fold, as in the Figma. */
     .pdp__slides {
       display: grid;
+      row-gap: 19px;
       overflow: visible;
-    }
-
-    .pdp__slide {
-      grid-area: 1 / 1;
-      max-height: none;
-      opacity: 0;
-      visibility: hidden;
-      transition:
-        opacity var(--pdp-ease),
-        visibility 0s linear 200ms;
-    }
-
-    .pdp__slide.is-active {
-      opacity: 1;
-      visibility: visible;
-      transition: opacity var(--pdp-ease);
-    }
-
-    /* The rail never sets the row height; it takes the plate's and scrolls. */
-    .pdp__thumbs {
-      flex-direction: column;
-      align-self: stretch;
-      gap: 1rem;
-      overflow: hidden auto;
-      contain: size;
-    }
-
-    .pdp__thumb {
-      width: 100%;
     }
 
     .pdp__index {
       display: none;
     }
-  }
 
-  /* --- Below desktop: media first, information beneath ---------------------- */
-
-  @media (max-width: 1023px) {
+    /* The title sits 122px below the media top at 1280px. */
     .pdp__info {
-      width: 100%;
-      max-width: 34rem;
+      padding-top: clamp(24px, 9.53vw, 160px);
     }
   }
 
   @media (max-width: 700px) {
-    /* Matches the header's own 20px inset at this width. */
     .pdp {
-      --pdp-gutter: 20px;
-      --pdp-label-w: 3rem;
-    }
-
-    .pdp__grid {
-      row-gap: 1.5rem;
-    }
-
-    .pdp__row-label,
-    .pdp__summary {
-      font-size: 14px;
-    }
-
-    .pdp__row {
-      column-gap: 1rem;
-    }
-
-    .pdp {
-      --pdp-box: 46px;
-    }
-
-    .pdp__values,
-    .pdp__qty {
-      gap: 6px;
-    }
-
-    .pdp__submit {
-      height: 56px;
-      font-size: 15px;
+      padding-top: 4px;
     }
   }
 
@@ -985,15 +858,14 @@
 
       var track = root.querySelector('[data-pdp-slides]');
       var slides = Array.prototype.slice.call(root.querySelectorAll('[data-pdp-slide]'));
-      var thumbs = Array.prototype.slice.call(root.querySelectorAll('[data-pdp-thumb]'));
       var index = root.querySelector('[data-pdp-index]');
       var active = Math.max(0, slides.findIndex(function (s) { return s.classList.contains('is-active'); }));
       var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
       /* ---------- Media ---------- */
 
-      // Tablet/phone CSS lays the slides out as a scroll-snap track; desktop
-      // stacks them. Asking the layout keeps breakpoints in CSS only.
+      // Phone CSS lays the slides out as a scroll-snap track; desktop shows them
+      // all in a column. Asking the layout keeps breakpoints in CSS only.
       function isTrack() {
         return track && track.scrollWidth > track.clientWidth + 1;
       }
@@ -1007,10 +879,6 @@
         }
         active = i;
         slides[i].classList.add('is-active');
-        thumbs.forEach(function (t, n) {
-          if (n === i) t.setAttribute('aria-current', 'true');
-          else t.removeAttribute('aria-current');
-        });
         if (index) index.textContent = pad(i + 1);
         if (scroll && isTrack()) {
           track.scrollTo({
@@ -1019,12 +887,6 @@
           });
         }
       }
-
-      thumbs.forEach(function (thumb) {
-        thumb.addEventListener('click', function () {
-          showMedia(Number(thumb.dataset.index), true);
-        });
-      });
 
       if (track) {
         var ticking = false;
@@ -1137,18 +999,22 @@
       var qtyInput = root.querySelector('[data-pdp-qty-input]');
       var qtyButtons = Array.prototype.slice.call(root.querySelectorAll('[data-pdp-qty]'));
 
+      // At the minimum the minus stays focusable and looks as drawn; it is only
+      // marked disabled for assistive tech.
       function syncQty() {
         var min = Number(qtyInput.min) || 1;
         qtyButtons.forEach(function (b) {
-          if (Number(b.dataset.pdpQty) < 0) b.disabled = (Number(qtyInput.value) || min) <= min;
+          if (Number(b.dataset.pdpQty) < 0) b.setAttribute('aria-disabled', String((Number(qtyInput.value) || min) <= min));
         });
       }
 
       if (qtyInput) {
         qtyButtons.forEach(function (b) {
           b.addEventListener('click', function () {
-            if (Number(b.dataset.pdpQty) > 0) qtyInput.stepUp();
-            else qtyInput.stepDown();
+            var min = Number(qtyInput.min) || 1;
+            var next = (Number(qtyInput.value) || min) + Number(b.dataset.pdpQty);
+            if (next < min) return;
+            qtyInput.value = next;
             qtyInput.dispatchEvent(new Event('change', { bubbles: true }));
           });
         });
@@ -1158,6 +1024,23 @@
           syncQty();
         });
         syncQty();
+      }
+
+      /* ---------- Disclosures ---------- */
+
+      var notes = root.querySelector('[data-pdp-notes]');
+      if (notes) {
+        notes.addEventListener('click', function (event) {
+          var toggle = event.target.closest('[data-pdp-toggle]');
+          if (!toggle) return;
+          var open = toggle.getAttribute('aria-expanded') !== 'true';
+          // One slot under the row: opening one closes the other.
+          notes.querySelectorAll('[data-pdp-toggle]').forEach(function (t) {
+            var isTarget = t === toggle;
+            t.setAttribute('aria-expanded', String(isTarget && open));
+            document.getElementById(t.getAttribute('aria-controls')).hidden = !(isTarget && open);
+          });
+        });
       }
     }
 
@@ -1180,7 +1063,21 @@
 {% schema %}
 {
   "name": "t:general.product",
-  "settings": [],
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "show_dynamic_checkout",
+      "label": "Show dynamic checkout buttons",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "preview_size_guide",
+      "label": "Show sample size guide for design preview",
+      "info": "Temporary. Shows example measurements on products with no size guide data. Never use on a live store.",
+      "default": false
+    }
+  ],
   "disabled_on": {
     "groups": ["header", "footer"]
   }

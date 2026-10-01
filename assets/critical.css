@@ -72,6 +72,31 @@ p:empty {
 }
 
 /** Theme styles below */
+
+/**
+ * The 1280px Figma's two-column split (554 · 125 · 472 inside 64px gutters).
+ * Shared by the PDP and the site footer, so the footer starts on the product
+ * information column.
+ */
+:root {
+  --split-gutter: 64px;
+  --split-columns: minmax(0, 554fr) minmax(0, 472fr);
+  --split-gap: clamp(40px, 9.77vw, 160px);
+  --split-max: 1792px;
+
+  /* The footer's space above, and the height of its text block (three 12px
+     lines on a ~25px rhythm). The PDP pulls the footer up by their sum so it
+     ends level with the bottom of the media column. */
+  --site-footer-gap: 4rem;
+  --site-footer-block: 62px;
+}
+
+@media (max-width: 700px) {
+  :root {
+    --split-gutter: 20px;
+  }
+}
+
 body {
   font-family: var(--font-primary--family);
   background-color: var(--color-background);

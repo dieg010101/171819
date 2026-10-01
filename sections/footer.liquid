@@ -1,39 +1,281 @@
-<footer>
-  <div class="footer__copyright">
-    &copy;
-    {{ 'now' | date: '%Y' }}
-    {{ shop.name | link_to: routes.root_url }}, {{ powered_by_link }}
-  </div>
+{% comment %}
+  Site footer: link rows and the newsletter, set on the right-hand column of the
+  shared two-column split (see --split-* in assets/critical.css), so it lines up
+  with the product information on the PDP and keeps that position elsewhere.
 
-  <div class="footer__links">
-    {% for link in section.settings.menu.links %}
-      {{ link.title | link_to: link.url }}
-    {% endfor %}
-  </div>
+  The five links are fixed parts of the design, so their labels always render;
+  each destination is its own setting. Contact and the California notice fall
+  back to the store's contact page and privacy policy. A label with no
+  destination yet renders as plain text in the same style, never as a dead
+  link. The newsletter is Shopify's customer form, tagged `newsletter`.
+{% endcomment %}
 
-  <div class="footer__payment">
-    {% if section.settings.show_payment_icons %}
-      {% for type in shop.enabled_payment_types %}
-        {{ type | payment_type_svg_tag }}
-      {% endfor %}
-    {% endif %}
+{%- liquid
+  assign contact_url = section.settings.contact_url
+  if contact_url == blank
+    assign contact_url = pages['contact'].url
+  endif
+
+  assign california_privacy_url = section.settings.california_privacy_url
+  if california_privacy_url == blank
+    assign california_privacy_url = shop.privacy_policy.url
+  endif
+
+  assign row_one_labels = 'Instagram|Shipping & Returns|Contact|Legal' | split: '|'
+  assign row_two_labels = 'California Privacy Notice' | split: '|'
+-%}
+
+<footer class="site-footer full-width">
+  <div class="site-footer__inner">
+    <nav class="site-footer__nav" aria-label="Footer">
+      {%- for row in (1..2) -%}
+        {%- liquid
+          assign labels = row_one_labels
+          if row == 2
+            assign labels = row_two_labels
+          endif
+        -%}
+        <ul class="site-footer__links">
+          {%- for label in labels -%}
+            {%- liquid
+              case label
+                when 'Instagram'
+                  assign url = section.settings.instagram_url
+                when 'Shipping & Returns'
+                  assign url = section.settings.shipping_returns_url
+                when 'Contact'
+                  assign url = contact_url
+                when 'Legal'
+                  assign url = section.settings.legal_url
+                else
+                  assign url = california_privacy_url
+              endcase
+            -%}
+            <li>
+              {%- if url != blank -%}
+                <a
+                  class="site-footer__link"
+                  href="{{ url }}"
+                  {% if url contains '://' %}
+                    target="_blank" rel="noopener"
+                  {% endif %}
+                >
+                  {{- label | escape -}}
+                </a>
+              {%- else -%}
+                <span class="site-footer__link">{{ label | escape }}</span>
+              {%- endif -%}
+            </li>
+          {%- endfor -%}
+        </ul>
+      {%- endfor -%}
+    </nav>
+
+    {%- form 'customer', id: 'FooterNewsletter', class: 'site-footer__newsletter' -%}
+      <input type="hidden" name="contact[tags]" value="newsletter">
+      <p class="site-footer__newsletter-title">Newsletter</p>
+
+      {%- if form.posted_successfully? -%}
+        <p class="site-footer__message" role="status">Thank you for subscribing.</p>
+      {%- else -%}
+        <div class="site-footer__field">
+          <label class="site-footer__label" for="FooterNewsletterEmail">Email</label>
+          <input
+            class="site-footer__input"
+            type="email"
+            id="FooterNewsletterEmail"
+            name="contact[email]"
+            autocomplete="email"
+            autocapitalize="off"
+            spellcheck="false"
+            required
+            {% if form.errors %}
+              aria-invalid="true" aria-describedby="FooterNewsletterError"
+            {% endif %}
+          >
+          <button class="site-footer__submit" type="submit" aria-label="Subscribe"></button>
+        </div>
+
+        {%- if form.errors -%}
+          <div class="site-footer__message" id="FooterNewsletterError" role="alert">
+            {{ form.errors | default_errors }}
+          </div>
+        {%- endif -%}
+      {%- endif -%}
+    {%- endform -%}
+
+    {%- if section.settings.show_payment_icons and shop.enabled_payment_types.size > 0 -%}
+      <div class="site-footer__payment">
+        {%- for type in shop.enabled_payment_types -%}
+          {{ type | payment_type_svg_tag }}
+        {%- endfor -%}
+      </div>
+    {%- endif -%}
   </div>
 </footer>
 
 {% stylesheet %}
-  footer {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 2rem;
+  .site-footer {
+    --site-footer-ink: #fff;
+    /* The Figma's 0.15px rules, as they render on #1b1b1b (as on the PDP). */
+    --site-footer-hairline: color-mix(in srgb, var(--site-footer-ink) 24%, transparent);
+
+    display: grid;
+    grid-template-columns: var(--split-columns);
+    column-gap: var(--split-gap);
+    width: 100%;
+    max-width: calc(var(--split-max) + 2 * var(--split-gutter));
+    margin: var(--site-footer-gap) auto 0;
+    /* 1509 − 1418 in the Figma. */
+    padding: 0 var(--split-gutter) 91px;
+    color: var(--site-footer-ink);
+    font-family: var(--font-secondary--family);
+    font-size: 11px;
+    line-height: 12px;
+    letter-spacing: -0.05em;
   }
-  footer a {
+
+  /* Content sits on the right-hand column; the left stays empty. At least the
+     reserved block tall, bottom-aligned, so the newsletter rule always lands on
+     the same line (the PDP aligns its last media to it). */
+  .site-footer__inner {
+    grid-column: 2;
+    display: grid;
+    align-content: end;
+    row-gap: 12px;
+    min-width: 0;
+    min-height: var(--site-footer-block);
+  }
+
+  .site-footer__nav {
+    display: grid;
+    row-gap: 13px;
+  }
+
+  .site-footer__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 13px 20px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .site-footer__link {
+    color: inherit;
     text-decoration: none;
-    color: var(--color-foreground);
   }
-  footer .footer__links,
-  footer .footer__payment {
+
+  a.site-footer__link:hover {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+  }
+
+  .site-footer :is(a, button):focus-visible {
+    outline: 1px solid var(--site-footer-ink);
+    outline-offset: 2px;
+  }
+
+  /* Newsletter · Email ______ □ : the field takes the column's right half. */
+  .site-footer__newsletter {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: end;
+  }
+
+  .site-footer__newsletter-title {
+    margin: 0;
+  }
+
+  .site-footer__field {
     display: flex;
-    gap: 1rem;
+    align-items: flex-end;
+  }
+
+  .site-footer__label {
+    flex: none;
+    margin-right: 9px;
+  }
+
+  .site-footer__input {
+    flex: 1;
+    min-width: 0;
+    height: 13px;
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid var(--site-footer-hairline);
+    border-radius: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    line-height: 12px;
+    letter-spacing: inherit;
+    outline: none;
+    transition: border-color 0.15s ease;
+  }
+
+  /* The rule itself is the focus indicator. */
+  .site-footer__input:focus-visible,
+  .site-footer__input[aria-invalid='true'] {
+    border-bottom-color: var(--site-footer-ink);
+  }
+
+  /* An 8px outlined square, with an invisible ~32px hit area. */
+  .site-footer__submit {
+    position: relative;
+    flex: none;
+    width: 8px;
+    height: 8px;
+    margin: 0 0 2px 9px;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--site-footer-ink) 45%, transparent);
+    border-radius: 0;
+    background: none;
+    cursor: pointer;
+  }
+
+  .site-footer__submit::before {
+    content: '';
+    position: absolute;
+    inset: -12px;
+  }
+
+  .site-footer__submit:hover {
+    border-color: var(--site-footer-ink);
+  }
+
+  .site-footer__message {
+    grid-column: 2;
+    margin: 0;
+  }
+
+  .site-footer__message :is(ul, li) {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .site-footer__newsletter > .site-footer__message[role='alert'] {
+    margin-top: 6px;
+  }
+
+  .site-footer__payment {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Below the two-column PDP: one column across the page. */
+  @media (max-width: 767px) {
+    .site-footer {
+      grid-template-columns: minmax(0, 1fr);
+      padding-bottom: 48px;
+    }
+
+    .site-footer__inner {
+      grid-column: 1;
+    }
   }
 {% endstylesheet %}
 
@@ -42,9 +284,31 @@
   "name": "t:general.footer",
   "settings": [
     {
-      "type": "link_list",
-      "id": "menu",
-      "label": "t:labels.menu"
+      "type": "url",
+      "id": "instagram_url",
+      "label": "Instagram link"
+    },
+    {
+      "type": "url",
+      "id": "shipping_returns_url",
+      "label": "Shipping & Returns link"
+    },
+    {
+      "type": "url",
+      "id": "contact_url",
+      "label": "Contact link",
+      "info": "Defaults to the Contact page."
+    },
+    {
+      "type": "url",
+      "id": "legal_url",
+      "label": "Legal link"
+    },
+    {
+      "type": "url",
+      "id": "california_privacy_url",
+      "label": "California Privacy Notice link",
+      "info": "Defaults to the privacy policy."
     },
     {
       "type": "checkbox",

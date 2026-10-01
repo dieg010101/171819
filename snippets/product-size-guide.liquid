@@ -1,0 +1,257 @@
+{% doc %}
+  Size guide: a CM / IN switch, then measurements by size as a table set in
+  plain text (no cell boxes).
+
+  Presentation only. It takes one normalised shape, so whatever eventually
+  supplies the guide (structured product data) only has to be mapped to it:
+  a JSON metafield or metaobject with `rows: [{ label, values: [] }]` maps with
+  `map: 'label'` and by `concat`-ing each row's values.
+
+  The caller decides whether a guide exists; this renders whatever it is given.
+
+  @param {string} unit - Unit the values are authored in: 'cm' or 'in'
+  @param {string[]} sizes - Column labels, e.g. S, M, L (independent of the variant options)
+  @param {string[]} rows - Measurement names, one per row, e.g. Length, Waist
+  @param {number[]} values - Numbers, row by row: rows.size × sizes.size entries
+  @param {string} [note] - Line shown under the measurements
+
+  @example
+  {% render 'product-size-guide', unit: 'cm', sizes: sizes, rows: rows, values: values, note: note %}
+{% enddoc %}
+
+{%- liquid
+  assign authored_unit = 'cm'
+  if unit == 'in'
+    assign authored_unit = 'in'
+  endif
+  assign columns = sizes.size
+  assign unit_options = 'cm,in' | split: ','
+-%}
+
+<div class="size-guide" data-size-guide data-size-guide-unit="{{ authored_unit }}">
+  <div class="size-guide__units" role="group" aria-label="Units">
+    {%- for option in unit_options -%}
+      <button
+        class="size-guide__unit"
+        type="button"
+        data-size-guide-unit-option="{{ option }}"
+        aria-pressed="{% if option == authored_unit %}true{% else %}false{% endif %}"
+      >
+        {{- option | upcase -}}
+      </button>
+    {%- endfor -%}
+  </div>
+
+  <div class="size-guide__body">
+    <div class="size-guide__scroll">
+      <table class="size-guide__table">
+        <caption class="size-guide__sr" data-size-guide-caption>
+          Measurements in {% if authored_unit == 'in' %}inches{% else %}centimetres{% endif %}
+        </caption>
+        <thead>
+          <tr>
+            <td></td>
+            {%- for size in sizes -%}
+              <th scope="col">{{ size }}</th>
+            {%- endfor -%}
+          </tr>
+        </thead>
+        <tbody>
+          {%- for row in rows -%}
+            {%- assign offset = forloop.index0 | times: columns -%}
+            <tr>
+              <th scope="row">{{ row }}</th>
+              {%- for size in sizes -%}
+                {%- assign value = values[offset] -%}
+                {%- assign offset = offset | plus: 1 -%}
+                {%- if value != blank -%}
+                  <td data-size-guide-value="{{ value }}">{{ value }}</td>
+                {%- else -%}
+                  <td></td>
+                {%- endif -%}
+              {%- endfor -%}
+            </tr>
+          {%- endfor -%}
+        </tbody>
+      </table>
+    </div>
+
+    {%- if note != blank -%}
+      <p class="size-guide__note">{{ note }}</p>
+    {%- endif -%}
+  </div>
+</div>
+
+{%- comment -%} The switch needs JS; without it the values simply stay in their authored unit. {%- endcomment -%}
+<noscript>
+  <style>
+    .size-guide__units { display: none; }
+  </style>
+</noscript>
+
+{% stylesheet %}
+  /*
+    Figma, 1280px: names start at 980, value columns at 1048 / 1084 / 1122 /
+    1158 / 1199 (an even ~37.75px pitch), rows every 25px, all 10/12. The last
+    column is only as wide as its text, so the table ends flush with its
+    container whatever the number of sizes.
+  */
+  .size-guide {
+    --size-guide-pitch: 37.75px;
+    --size-guide-label: 68px;
+
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    font-size: 10px;
+    line-height: 12px;
+    letter-spacing: -0.05em;
+  }
+
+  .size-guide__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .size-guide__units {
+    display: flex;
+    gap: 8px;
+  }
+
+  .size-guide__unit {
+    position: relative;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+  }
+
+  /* A larger, invisible hit area that never moves the text. */
+  .size-guide__unit::before {
+    content: '';
+    position: absolute;
+    inset: -8px -3px;
+  }
+
+  /* The active unit: a short rule 7px under the text, as in the Figma. */
+  .size-guide__unit::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 -7px;
+    height: 1px;
+    background-color: currentcolor;
+    opacity: 0;
+  }
+
+  .size-guide__unit[aria-pressed='true']::after {
+    opacity: 0.24;
+  }
+
+  .size-guide__unit:focus-visible {
+    outline: 1px solid currentcolor;
+    outline-offset: 2px;
+  }
+
+  .size-guide__body {
+    width: max-content;
+    max-width: 100%;
+    margin-top: 20px;
+  }
+
+  /* Only the table scrolls, and only if a long guide outgrows a phone. */
+  .size-guide__scroll {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .size-guide__table {
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .size-guide__table :is(th, td) {
+    width: var(--size-guide-pitch);
+    height: 25px;
+    padding: 0;
+    font-weight: 400;
+    text-align: left;
+    vertical-align: top;
+    white-space: nowrap;
+  }
+
+  .size-guide__table thead :is(th, td) {
+    height: 24px;
+  }
+
+  .size-guide__table :is(th, td):first-child {
+    width: var(--size-guide-label);
+    padding-right: 8px;
+  }
+
+  .size-guide__table :is(th, td):last-child {
+    width: auto;
+  }
+
+  /* As wide as the table, never wider: it wraps rather than pushing the
+     table off the right edge. */
+  .size-guide__note {
+    width: 0;
+    min-width: 100%;
+    margin: 7px 0 0;
+  }
+{% endstylesheet %}
+
+{% javascript %}
+  (function () {
+    'use strict';
+
+    /* ---------- Units: pure, no DOM ---------- */
+
+    var CM_PER_IN = 2.54;
+    var UNIT_NAMES = { cm: 'centimetres', in: 'inches' };
+
+    function convert(value, from, to) {
+      if (from === to) return value;
+      return from === 'cm' ? value / CM_PER_IN : value * CM_PER_IN;
+    }
+
+    // At most one decimal, without a trailing .0.
+    function format(value) {
+      return String(Math.round(value * 10) / 10);
+    }
+
+    /* ---------- DOM ---------- */
+
+    // Always converts from the authored value, so switching back and forth
+    // never accumulates rounding.
+    function setUnit(guide, unit) {
+      var authored = guide.dataset.sizeGuideUnit;
+      guide.querySelectorAll('[data-size-guide-value]').forEach(function (cell) {
+        cell.textContent = format(convert(Number(cell.dataset.sizeGuideValue), authored, unit));
+      });
+      guide.querySelectorAll('[data-size-guide-unit-option]').forEach(function (button) {
+        button.setAttribute('aria-pressed', String(button.dataset.sizeGuideUnitOption === unit));
+      });
+      var caption = guide.querySelector('[data-size-guide-caption]');
+      if (caption) caption.textContent = 'Measurements in ' + UNIT_NAMES[unit];
+    }
+
+    document.addEventListener('click', function (event) {
+      var button = event.target.closest('[data-size-guide-unit-option]');
+      if (!button) return;
+      var guide = button.closest('[data-size-guide]');
+      if (guide) setUnit(guide, button.dataset.sizeGuideUnitOption);
+    });
+  })();
+{% endjavascript %}

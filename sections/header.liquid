@@ -45,7 +45,10 @@
     font-family: var(--font-primary--family);
   }
 
+  /* Flex, so the link isn't set on a line box sized by the header's Inter
+     strut and SHOP stays level with CART. */
   .site-header__nav {
+    display: flex;
     justify-self: start;
   }
 
@@ -57,10 +60,11 @@
     /* inline-block so line-height applies to the box: SHOP and CART then share
        the brand's first-line baseline instead of aligning by coincidence. */
     display: inline-block;
-    font-size: 16px;
+    /* Assistant, from the theme's secondary font setting. */
+    font-family: var(--font-secondary--family);
+    font-size: 11px;
     font-weight: 400;
     line-height: 30px;
-    letter-spacing: 0.02em;
     text-transform: uppercase;
     text-decoration: none;
     white-space: nowrap;
@@ -85,17 +89,18 @@
     transition: color 0.15s ease;
   }
 
-  /* Weight and tracking are paired exactly as in the flock wordmark
-     (CONFIG.logo.lines): 700 lines track -0.04em, the 400 line -0.015em. */
+  /* Tracking is fitted to the Figma line widths as Inter renders them (the
+     flock intro's values are tuned for Helvetica Neue and don't transfer):
+     the light middle line closes up more than the bold ones. */
   .site-header__brand-line {
     display: block;
     font-weight: 400;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.04em;
   }
 
   .site-header__brand-line--strong {
     font-weight: 700;
-    letter-spacing: -0.04em;
+    letter-spacing: -0.015em;
   }
 
   .site-header__link:hover,
@@ -114,9 +119,9 @@
       padding: 20px;
     }
 
+    /* Matches the brand's first line so SHOP / CART stay on its baseline. */
     .site-header__link {
-      font-size: 13px;
-      line-height: 20px;
+      line-height: 19px;
     }
 
     .site-header__brand {
