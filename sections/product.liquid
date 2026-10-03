@@ -31,11 +31,9 @@
   # authored in, column labels (independent of the variant options), measurement
   # names, and a flat row-by-row list of values.
   #
-  # Priority: 1. exactly one valid size guide assigned to this product; 2. the
-  # design-preview sample, only when the section's "preview_size_guide" setting
-  # is on AND no guide is assigned; 3. nothing, in which case the Size Guide
-  # control is not rendered. A product in more than one guide, or assigned to a
-  # malformed guide, renders nothing, not even the sample: no measurements beat
+  # Only a product assigned to exactly one valid size guide shows one; otherwise
+  # the Size Guide control is not rendered. A product in more than one guide, or
+  # assigned to a malformed guide, renders nothing: no measurements beat
   # possibly wrong ones.
   assign size_guide_unit = 'cm'
   assign size_guide_sizes = '' | split: ','
@@ -107,23 +105,6 @@
 
   assign has_size_guide = false
   if size_guide_sizes.size > 0 and size_guide_rows.size > 0
-    assign has_size_guide = true
-  endif
-
-  # TEMPORARY, design preview only: the Figma's example measurements, so the
-  # Size Guide can be seen in the theme editor before real data exists. Never
-  # product data, and never shown over a real or an ambiguous guide. Remove with
-  # the setting once real guides are live.
-  if has_size_guide == false and size_guide_invalid == false and section.settings.preview_size_guide
-    assign size_guide_unit = 'cm'
-    assign size_guide_sizes = 'S,M,L,XL,XXL' | split: ','
-    assign size_guide_rows = 'Length,Waist,Thigh,Leg Opening,Front Rise,Back Rise' | split: ','
-    assign sample_row = '70,71.5,73,74.5,76' | split: ','
-    assign size_guide_values = sample_row
-    for row in (2..6)
-      assign size_guide_values = size_guide_values | concat: sample_row
-    endfor
-    assign size_guide_note = 'Measurements taken with garment laid flat.'
     assign has_size_guide = true
   endif
 -%}
@@ -729,10 +710,12 @@
   /* --- Disclosures -------------------------------------------------------- */
 
   /* One grid for the row and its panels: the toggles sit at either end, and
-     panels can align to them (the size guide's units sit under its toggle). */
+     panels can align to them (the size guide's units sit under its toggle).
+     The middle track may shrink to nothing, so a wide guide stays inside the
+     column instead of widening the grid past it. */
   .pdp__notes {
     display: grid;
-    grid-template-columns: max-content 1fr max-content;
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
     margin-top: 17px;
     font-size: 10px;
     line-height: 12px;
@@ -1132,13 +1115,6 @@
       "type": "checkbox",
       "id": "show_dynamic_checkout",
       "label": "Show dynamic checkout buttons",
-      "default": false
-    },
-    {
-      "type": "checkbox",
-      "id": "preview_size_guide",
-      "label": "Show sample size guide for design preview",
-      "info": "Temporary. Shows example measurements on products with no size guide data. Never use on a live store.",
       "default": false
     }
   ],

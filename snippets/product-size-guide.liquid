@@ -234,11 +234,13 @@
     /* ---------- DOM ---------- */
 
     // Always converts from the authored value, so switching back and forth
-    // never accumulates rounding.
+    // never accumulates rounding; the authored unit shows the value exactly as
+    // rendered by Liquid, whatever its precision.
     function setUnit(guide, unit) {
       var authored = guide.dataset.sizeGuideUnit;
       guide.querySelectorAll('[data-size-guide-value]').forEach(function (cell) {
-        cell.textContent = format(convert(Number(cell.dataset.sizeGuideValue), authored, unit));
+        var value = cell.dataset.sizeGuideValue;
+        cell.textContent = unit === authored ? value : format(convert(Number(value), authored, unit));
       });
       guide.querySelectorAll('[data-size-guide-unit-option]').forEach(function (button) {
         button.setAttribute('aria-pressed', String(button.dataset.sizeGuideUnitOption === unit));
