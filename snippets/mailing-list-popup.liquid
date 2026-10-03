@@ -1,0 +1,377 @@
+{% doc %}
+  Mailing-list popup: a grey frame holding an image, a decorative braille
+  mark, "Mailing list" and the newsletter form, over the storefront seen
+  through a #E3C51D difference blend.
+
+  A native modal <dialog>: showModal() puts it in the top layer, above every
+  page layer (the bird intro included), makes the page inert and traps focus.
+  The blend is the dialog's own ::backdrop, which the browser paints over the
+  rendered page and under the dialog, so the whole page (images too) shifts
+  colour while the popup keeps its own. Closing removes both; nothing is left
+  on the page.
+
+  Opened by any [data-mailing-list-open] control (the footer's "Newsletter")
+  and, optionally, once per session after a delay.
+
+  Geometry follows the 1280px Figma, where the popup is 432 × 736 with a
+  380 × 610 image. Insets scale with the popup (cqw, 1cqw = 4.32px at full
+  size); the 11px type and the line spacing around it do not.
+
+  @param {object} [image] - Image setting; decorative, so its alt is empty
+  @param {boolean} [auto_open] - Open by itself once per session
+  @param {number} [delay] - Seconds before opening by itself
+
+  @example
+  {% render 'mailing-list-popup', image: section.settings.mailing_list_image, auto_open: true, delay: 15 %}
+{% enddoc %}
+
+<dialog
+  class="mailing-list"
+  id="MailingList"
+  aria-labelledby="MailingListTitle"
+  scroll-lock
+  data-mailing-list
+  data-auto-open="{{ auto_open | default: false }}"
+  data-delay="{{ delay | default: 15 }}"
+>
+  <button class="mailing-list__close" type="button" aria-label="Close mailing list" data-mailing-list-close>
+    <span aria-hidden="true">x</span>
+  </button>
+
+  <div class="mailing-list__media">
+    {%- if image != blank -%}
+      {{
+        image
+        | image_url: width: 760
+        | image_tag:
+          class: 'mailing-list__image',
+          widths: '380, 570, 760',
+          sizes: 'min(380px, calc(100vw - 80px))',
+          loading: 'lazy',
+          alt: ''
+      }}
+    {%- else -%}
+      {{ 'image' | placeholder_svg_tag: 'mailing-list__image mailing-list__placeholder' }}
+    {%- endif -%}
+    <span class="mailing-list__mark" aria-hidden="true">⠂⠶⠂⠦⠂⠔</span>
+  </div>
+
+  <div class="mailing-list__body">
+    <h2 class="mailing-list__title" id="MailingListTitle">Mailing list</h2>
+    {% render 'newsletter-form', id: 'MailingListForm', block: 'mailing-list' %}
+  </div>
+</dialog>
+
+{% stylesheet %}
+  .mailing-list {
+    --mailing-list-ink: #000;
+
+    container-type: inline-size;
+    /* 432px at full size; narrower on small screens, and never taller than the
+       viewport less 20px a side. Only the insets and the image grow with the
+       width (height = 1.4861 × width + 94px of text), so solve for width. */
+    width: min(432px, calc(100vw - 40px), calc((100svh - 134px) / 1.4861));
+    max-width: none;
+    max-height: calc(100svh - 16px);
+    /* The theme's reset removes the dialog's centring margin. A slightly larger
+       bottom inset sits it a little above centre, as in the Figma. */
+    inset: 0 0 3svh;
+    margin: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    overflow: auto;
+    background: #d9d9d9;
+    color: var(--mailing-list-ink);
+    font-family: var(--font-secondary--family);
+    font-size: 11px;
+    line-height: 12px;
+    letter-spacing: -0.05em;
+  }
+
+  /* The storefront, seen through the Figma's #E3C51D difference layer. */
+  .mailing-list::backdrop {
+    background-color: #e3c51d;
+    mix-blend-mode: difference;
+  }
+
+  /* "x", 17px in and 11px down; the hit area is larger and invisible. */
+  .mailing-list__close {
+    position: absolute;
+    top: 11px;
+    left: 17px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+  }
+
+  .mailing-list__close::before {
+    content: '';
+    position: absolute;
+    inset: -10px -14px;
+  }
+
+  /* 380 × 610, 32px down, 27px in from the left and 25px from the right.
+     The top inset never gets so small that the image meets the "x". */
+  .mailing-list__media {
+    position: relative;
+    aspect-ratio: 380 / 610;
+    margin: max(7.407cqw, 26px) 5.787cqw 0 6.25cqw;
+    overflow: hidden;
+  }
+
+  .mailing-list__image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .mailing-list__placeholder {
+    background-color: #c4c4c4;
+    fill: #a8a8a8;
+  }
+
+  /* The braille string is drawn by the system's braille font (Assistant has
+     none); placed so its dots land where the Figma's do, 48px at full size. */
+  .mailing-list__mark {
+    position: absolute;
+    top: 79.03%;
+    left: 48.16%;
+    color: #fff;
+    font-size: 11.111cqw;
+    line-height: 0;
+    letter-spacing: -0.05em;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  /* "Mailing list" 21px under the image, and the form 20px under that, both
+     starting 152px in; the form ends level with the image's right edge. */
+  .mailing-list__body {
+    position: relative;
+    padding: 21px 5.787cqw 29px 35.185cqw;
+  }
+
+  .mailing-list__title {
+    margin: 0;
+    font: inherit;
+    letter-spacing: inherit;
+  }
+
+  .mailing-list__form {
+    position: relative;
+    margin-top: 20px;
+  }
+
+  /* Email · 199px rule · 8px square, as in the footer but in black. */
+  .mailing-list__field {
+    display: flex;
+    align-items: flex-end;
+  }
+
+  .mailing-list__label {
+    flex: none;
+    width: 34px;
+  }
+
+  .mailing-list__input {
+    flex: 1;
+    min-width: 0;
+    height: 12px;
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--mailing-list-ink) 32%, transparent);
+    border-radius: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    line-height: 12px;
+    letter-spacing: inherit;
+    outline: none;
+  }
+
+  /* The rule itself is the focus indicator. */
+  .mailing-list__input:focus-visible,
+  .mailing-list__input[aria-invalid='true'] {
+    border-bottom-color: var(--mailing-list-ink);
+  }
+
+  .mailing-list__submit {
+    position: relative;
+    flex: none;
+    width: 8px;
+    height: 8px;
+    margin: 0 0 2px 14px;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--mailing-list-ink) 45%, transparent);
+    border-radius: 0;
+    background: none;
+    cursor: pointer;
+  }
+
+  .mailing-list__submit::before {
+    content: '';
+    position: absolute;
+    inset: -12px;
+  }
+
+  .mailing-list__submit:hover {
+    border-color: var(--mailing-list-ink);
+  }
+
+  .mailing-list button:focus-visible {
+    outline: 1px solid var(--mailing-list-ink);
+    outline-offset: 2px;
+  }
+
+  /* Success replaces the field on its line; an error hangs below it in the
+     space above the frame's edge, so the popup never changes size. */
+  .mailing-list__message {
+    margin: 0;
+  }
+
+  .mailing-list__message[role='alert'] {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 34px;
+    right: 0;
+  }
+
+  .mailing-list__message :is(ul, li) {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+{% endstylesheet %}
+
+{% javascript %}
+  (function () {
+    'use strict';
+
+    var DISMISSED = 'mailing-list:dismissed';
+
+    // Session only: a closed popup stays closed for this visit, never longer.
+    function remember() {
+      try {
+        sessionStorage.setItem(DISMISSED, '1');
+      } catch (e) {
+        /* storage unavailable: the popup may simply open again */
+      }
+    }
+
+    function isDismissed() {
+      try {
+        return sessionStorage.getItem(DISMISSED) === '1';
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function init(dialog) {
+      if (dialog.dataset.mailingListReady === 'true' || typeof dialog.showModal !== 'function') return;
+      dialog.dataset.mailingListReady = 'true';
+
+      var opener = null;
+
+      function open(trigger) {
+        if (!dialog.isConnected || dialog.open || document.querySelector('dialog[open]')) return;
+        opener = trigger || null;
+        dialog.showModal();
+        // showModal() normally focuses the first control; make sure it did.
+        if (!dialog.contains(document.activeElement)) {
+          dialog.querySelector('[data-mailing-list-close]').focus();
+        }
+      }
+      dialog.mailingListOpen = open;
+
+      function restoreFocus() {
+        if (opener && opener.isConnected) opener.focus();
+        opener = null;
+      }
+
+      // Done as each close happens: the `close` event itself fires later, and
+      // the browser only restores focus to whatever was focused before opening.
+      function close() {
+        remember();
+        dialog.close();
+        restoreFocus();
+      }
+
+      dialog.addEventListener('cancel', remember); // Esc
+      dialog.addEventListener('close', function () {
+        remember();
+        restoreFocus();
+      });
+
+      // x, or a click on the transformed page around the popup. (Clicks on the
+      // ::backdrop are dispatched to the dialog itself, outside its box.)
+      dialog.addEventListener('click', function (event) {
+        if (event.target.closest('[data-mailing-list-close]')) {
+          close();
+          return;
+        }
+        if (event.target !== dialog) return;
+        var box = dialog.getBoundingClientRect();
+        var outside =
+          event.clientX < box.left || event.clientX > box.right ||
+          event.clientY < box.top || event.clientY > box.bottom;
+        if (outside) close();
+      });
+
+      // Back from submitting this popup's form: show its result. After `load`,
+      // because the browser's own jump to that #hash would take focus back out.
+      var form = dialog.querySelector('[data-newsletter-form]');
+      if (form && window.location.hash === '#' + form.id) {
+        var showResult = function () {
+          setTimeout(function () {
+            open(document.querySelector('[data-mailing-list-open][aria-controls="' + dialog.id + '"]'));
+          }, 0);
+        };
+        if (document.readyState === 'complete') showResult();
+        else window.addEventListener('load', showResult, { once: true });
+        return;
+      }
+
+      // Optional automatic opening: once per session, never in the theme
+      // editor, and never over the homepage's bird intro (wait it out).
+      var designMode = window.Shopify && window.Shopify.designMode;
+      if (dialog.dataset.autoOpen !== 'true' || designMode || isDismissed()) return;
+      var delay = (Number(dialog.dataset.delay) || 15) * 1000;
+      (function schedule() {
+        setTimeout(function () {
+          if (isDismissed() || !dialog.isConnected) return;
+          if (document.querySelector('[data-flock-intro]')) return schedule();
+          open(null);
+        }, delay);
+      })();
+    }
+
+    // One listener for every trigger, so a re-rendered section never leaves
+    // one behind that points at a removed dialog.
+    document.addEventListener('click', function (event) {
+      var trigger = event.target.closest('[data-mailing-list-open]');
+      if (!trigger) return;
+      var dialog = document.getElementById(trigger.getAttribute('aria-controls'));
+      if (dialog && dialog.mailingListOpen) dialog.mailingListOpen(trigger);
+    });
+
+    function initAll() {
+      document.querySelectorAll('[data-mailing-list]').forEach(init);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initAll);
+    } else {
+      initAll();
+    }
+
+    document.addEventListener('shopify:section:load', initAll);
+  })();
+{% endjavascript %}

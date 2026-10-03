@@ -7,7 +7,9 @@
   each destination is its own setting. Contact and the California notice fall
   back to the store's contact page and privacy policy. A label with no
   destination yet renders as plain text in the same style, never as a dead
-  link. The newsletter is Shopify's customer form, tagged `newsletter`.
+  link. The newsletter is Shopify's customer form, tagged `newsletter`
+  (snippets/newsletter-form.liquid); "Newsletter" opens the mailing-list popup
+  (snippets/mailing-list-popup.liquid), which uses the same form.
 {% endcomment %}
 
 {%- liquid
@@ -71,38 +73,19 @@
       {%- endfor -%}
     </nav>
 
-    {%- form 'customer', id: 'FooterNewsletter', class: 'site-footer__newsletter' -%}
-      <input type="hidden" name="contact[tags]" value="newsletter">
-      <p class="site-footer__newsletter-title">Newsletter</p>
-
-      {%- if form.posted_successfully? -%}
-        <p class="site-footer__message" role="status">Thank you for subscribing.</p>
-      {%- else -%}
-        <div class="site-footer__field">
-          <label class="site-footer__label" for="FooterNewsletterEmail">Email</label>
-          <input
-            class="site-footer__input"
-            type="email"
-            id="FooterNewsletterEmail"
-            name="contact[email]"
-            autocomplete="email"
-            autocapitalize="off"
-            spellcheck="false"
-            required
-            {% if form.errors %}
-              aria-invalid="true" aria-describedby="FooterNewsletterError"
-            {% endif %}
-          >
-          <button class="site-footer__submit" type="submit" aria-label="Subscribe"></button>
-        </div>
-
-        {%- if form.errors -%}
-          <div class="site-footer__message" id="FooterNewsletterError" role="alert">
-            {{ form.errors | default_errors }}
-          </div>
-        {%- endif -%}
-      {%- endif -%}
-    {%- endform -%}
+    {%- comment -%} "Newsletter" opens the mailing-list popup; the inline field stays, as drawn. {%- endcomment -%}
+    <div class="site-footer__newsletter">
+      <button
+        class="site-footer__newsletter-title"
+        type="button"
+        aria-haspopup="dialog"
+        aria-controls="MailingList"
+        data-mailing-list-open
+      >
+        Newsletter
+      </button>
+      {%- render 'newsletter-form', id: 'FooterNewsletter', block: 'site-footer' -%}
+    </div>
 
     {%- if section.settings.show_payment_icons and shop.enabled_payment_types.size > 0 -%}
       <div class="site-footer__payment">
@@ -113,6 +96,12 @@
     {%- endif -%}
   </div>
 </footer>
+
+{% render 'mailing-list-popup',
+  image: section.settings.mailing_list_image,
+  auto_open: section.settings.mailing_list_auto_open,
+  delay: section.settings.mailing_list_delay
+%}
 
 {% stylesheet %}
   .site-footer {
@@ -177,15 +166,36 @@
     outline-offset: 2px;
   }
 
-  /* Newsletter · Email ______ □ : the field takes the column's right half. */
+  /* Newsletter · Email ______ □ : the field takes the column's right half.
+     The form adds no box, so its field and message sit on this grid. */
   .site-footer__newsletter {
     display: grid;
     grid-template-columns: 1fr 1fr;
     align-items: end;
   }
 
+  .site-footer__form {
+    display: contents;
+  }
+
+  /* A button set as plain text, like the links beside it. */
   .site-footer__newsletter-title {
-    margin: 0;
+    justify-self: start;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .site-footer__newsletter-title:hover {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
   }
 
   .site-footer__field {
@@ -256,7 +266,7 @@
     list-style: none;
   }
 
-  .site-footer__newsletter > .site-footer__message[role='alert'] {
+  .site-footer__message[role='alert'] {
     margin-top: 6px;
   }
 
@@ -315,6 +325,32 @@
       "id": "show_payment_icons",
       "label": "t:labels.show_payment_icons",
       "default": true
+    },
+    {
+      "type": "header",
+      "content": "Mailing list popup"
+    },
+    {
+      "type": "image_picker",
+      "id": "mailing_list_image",
+      "label": "Image"
+    },
+    {
+      "type": "checkbox",
+      "id": "mailing_list_auto_open",
+      "label": "Automatically show mailing list popup",
+      "info": "Once per visit. \"Newsletter\" in the footer always opens it.",
+      "default": false
+    },
+    {
+      "type": "range",
+      "id": "mailing_list_delay",
+      "label": "Delay before showing",
+      "min": 5,
+      "max": 60,
+      "step": 5,
+      "unit": "s",
+      "default": 15
     }
   ]
 }

@@ -1,0 +1,82 @@
+{% doc %}
+  Newsletter signup: Shopify's customer form tagged `newsletter`, set as
+  "Email ____ □". Shared by the footer and the mailing-list popup so both
+  subscribe the same way; each caller styles it through its own BEM block.
+
+  Shopify reloads the page after a post, and every newsletter form on it then
+  reports the same success or errors. The form's action is /contact#<id>, and
+  that hash survives the reload, so the script below can tell which form was
+  actually sent.
+
+  @param {string} id - Form id, unique on the page (also prefixes the field ids)
+  @param {string} block - BEM block for the form's classes, e.g. 'site-footer'
+
+  @example
+  {% render 'newsletter-form', id: 'FooterNewsletter', block: 'site-footer' %}
+{% enddoc %}
+
+{%- liquid
+  assign email_id = id | append: 'Email'
+  assign error_id = id | append: 'Error'
+  assign form_class = block | append: '__form'
+-%}
+
+{%- form 'customer', id: id, class: form_class, data-newsletter-form: '' -%}
+  <input type="hidden" name="contact[tags]" value="newsletter">
+
+  {%- if form.posted_successfully? -%}
+    <p class="{{ block }}__message" role="status">Thank you for subscribing.</p>
+  {%- else -%}
+    <div class="{{ block }}__field">
+      <label class="{{ block }}__label" for="{{ email_id }}">Email</label>
+      <input
+        class="{{ block }}__input"
+        type="email"
+        id="{{ email_id }}"
+        name="contact[email]"
+        autocomplete="email"
+        autocapitalize="off"
+        spellcheck="false"
+        required
+        {% if form.errors %}
+          aria-invalid="true" aria-describedby="{{ error_id }}"
+        {% endif %}
+      >
+      <button class="{{ block }}__submit" type="submit" aria-label="Subscribe"></button>
+    </div>
+
+    {%- if form.errors -%}
+      <div class="{{ block }}__message" id="{{ error_id }}" role="alert" data-newsletter-error>
+        {{ form.errors | default_errors }}
+      </div>
+    {%- endif -%}
+  {%- endif -%}
+{%- endform -%}
+
+{% javascript %}
+  (function () {
+    'use strict';
+
+    // Errors belong only to the form that was sent (named by the URL hash);
+    // clear them from every other newsletter form on the page.
+    function clearForeignErrors() {
+      var sent = window.location.hash.slice(1);
+      document.querySelectorAll('[data-newsletter-form]').forEach(function (form) {
+        if (form.id === sent) return;
+        form.querySelectorAll('[data-newsletter-error]').forEach(function (error) {
+          error.remove();
+        });
+        form.querySelectorAll('[aria-invalid]').forEach(function (input) {
+          input.removeAttribute('aria-invalid');
+          input.removeAttribute('aria-describedby');
+        });
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', clearForeignErrors);
+    } else {
+      clearForeignErrors();
+    }
+  })();
+{% endjavascript %}
