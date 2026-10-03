@@ -26,20 +26,84 @@
     assign status_label = 'Sold out'
   endif
 
-  # Size guide seam. The guide is structured product data, normalised to the
-  # shape snippets/product-size-guide.liquid documents: the unit the values are
+  # Size guide seam. The guide is normalised to the shape
+  # snippets/product-size-guide.liquid documents: the unit the values are
   # authored in, column labels (independent of the variant options), measurement
   # names, and a flat row-by-row list of values.
   #
-  # Priority: 1. real structured data (no source is connected yet, so these
-  # start empty); 2. the design-preview sample, only when the section's
-  # "preview_size_guide" setting is on AND there is no real data; 3. nothing,
-  # in which case the Size Guide control is not rendered.
+  # Priority: 1. exactly one valid size guide assigned to this product; 2. the
+  # design-preview sample, only when the section's "preview_size_guide" setting
+  # is on AND no guide is assigned; 3. nothing, in which case the Size Guide
+  # control is not rendered. A product in more than one guide, or assigned to a
+  # malformed guide, renders nothing, not even the sample: no measurements beat
+  # possibly wrong ones.
   assign size_guide_unit = 'cm'
   assign size_guide_sizes = '' | split: ','
   assign size_guide_rows = '' | split: ','
   assign size_guide_values = '' | split: ','
   assign size_guide_note = ''
+
+  # Size guide resolver. Guides are Sanity "sizeGuide" documents that Sanity
+  # Connect syncs as metaobjects of the type below, each with `products` (a
+  # list of Product references) and `data` (JSON: sizes[], measurements[] of
+  # { label, values[] } in centimetres, note). The guide owns the relationship,
+  # so this product's guide is found by checking each guide's products by
+  # product ID. If Shopify reports a different type, change it here only.
+  #
+  # The current resolver is intended for a small number of Size Guides. If the
+  # catalog grows to more than roughly the unpaginated Liquid metaobject lookup
+  # can safely cover (Shopify loops over at most 50 entries of a definition),
+  # replace this resolver with a direct indexed Product → Size Guide lookup.
+  assign size_guide_type = 'app--6007307--sanity-documents-sizeGuide'
+  assign size_guide_matches = 0
+  assign size_guide_entry = nil
+  for guide in metaobjects[size_guide_type].values
+    for assigned in guide.products.value
+      if assigned.id == product.id
+        assign size_guide_matches = size_guide_matches | plus: 1
+        assign size_guide_entry = guide
+        break
+      endif
+    endfor
+    # Two matches already make it ambiguous; no need to look further.
+    if size_guide_matches > 1
+      break
+    endif
+  endfor
+
+  # Studio validation guarantees this shape; check it anyway, since the values
+  # are laid out row by row and one short row would shift every later value.
+  assign size_guide_invalid = false
+  if size_guide_matches > 1
+    assign size_guide_invalid = true
+  elsif size_guide_matches == 1
+    assign size_guide_data = size_guide_entry.data.value
+    assign guide_sizes = size_guide_data.sizes
+    assign guide_measurements = size_guide_data.measurements
+    if guide_sizes == blank or guide_measurements == blank
+      assign size_guide_invalid = true
+    endif
+    for measurement in guide_measurements
+      if measurement.label == blank or measurement.values.size != guide_sizes.size
+        assign size_guide_invalid = true
+      endif
+      for value in measurement.values
+        assign number = value | plus: 0
+        if value == blank or number <= 0
+          assign size_guide_invalid = true
+        endif
+      endfor
+    endfor
+
+    if size_guide_invalid == false
+      assign size_guide_sizes = guide_sizes
+      assign size_guide_rows = guide_measurements | map: 'label'
+      for measurement in guide_measurements
+        assign size_guide_values = size_guide_values | concat: measurement.values
+      endfor
+      assign size_guide_note = size_guide_data.note
+    endif
+  endif
 
   assign has_size_guide = false
   if size_guide_sizes.size > 0 and size_guide_rows.size > 0
@@ -48,9 +112,9 @@
 
   # TEMPORARY, design preview only: the Figma's example measurements, so the
   # Size Guide can be seen in the theme editor before real data exists. Never
-  # product data, and never shown over real data. Remove with the setting once
-  # the structured source is connected.
-  if has_size_guide == false and section.settings.preview_size_guide
+  # product data, and never shown over a real or an ambiguous guide. Remove with
+  # the setting once real guides are live.
+  if has_size_guide == false and size_guide_invalid == false and section.settings.preview_size_guide
     assign size_guide_unit = 'cm'
     assign size_guide_sizes = 'S,M,L,XL,XXL' | split: ','
     assign size_guide_rows = 'Length,Waist,Thigh,Leg Opening,Front Rise,Back Rise' | split: ','
