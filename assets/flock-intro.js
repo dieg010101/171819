@@ -54,10 +54,18 @@
   function dismiss() {
     if (done) return;
     done = true;
+    // Removing the focused trigger would drop focus to <body>; only then is
+    // there a focus position to restore.
+    var hadFocus = root.contains(document.activeElement);
     for (var i = 0; i < inerted.length; i++) inerted[i].inert = false;
     inerted.length = 0;
     document.documentElement.classList.remove(SCROLL_LOCK_CLASS);
     root.remove();
+    if (hadFocus) {
+      // The skip link's target: focusable via tabindex="-1", not in tab order.
+      var main = document.getElementById("MainContent");
+      if (main) main.focus({ preventScroll: true });
+    }
     teardownEngine();
   }
 

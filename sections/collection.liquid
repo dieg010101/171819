@@ -214,6 +214,11 @@
             if forloop.index <= 5
               assign loading = 'eager'
             endif
+            # The first card is the measured LCP image at phone and desktop widths.
+            assign priority = 'auto'
+            if forloop.first
+              assign priority = 'high'
+            endif
 
             assign primary = product.featured_media.preview_image
             assign secondary = nil
@@ -236,6 +241,7 @@
                       widths: '240, 360, 480, 640, 800, 960',
                       sizes: '(min-width: 1880px) calc((100vw - 128px) / 5), (min-width: 1100px) calc((100vw - 128px) / 4), (min-width: 701px) calc((100vw - 128px) / 3), calc((100vw - 40px) / 2)',
                       loading: loading,
+                      fetchpriority: priority,
                       alt: primary.alt | default: product.title
                   }}
                 {%- else -%}
@@ -331,7 +337,8 @@
 
 {% stylesheet %}
   .shop {
-    --shop-quiet: color-mix(in srgb, var(--color-foreground) 62%, var(--color-background));
+    /* 64%: the least that keeps quiet text at 4.5:1 with the default colours. */
+    --shop-quiet: color-mix(in srgb, var(--color-foreground) 64%, var(--color-background));
     --shop-rule: color-mix(in srgb, var(--color-foreground) 22%, transparent);
     /* Same outer inset as the header, so the grid hangs from SHOP and CART. */
     --shop-gutter: 64px;

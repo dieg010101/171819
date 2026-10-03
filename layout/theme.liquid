@@ -53,6 +53,10 @@
     {% sections 'header-group' %}
 
     <main id="MainContent" tabindex="-1">
+      {%- # The homepage has no visible headline; its sections render no h1. -%}
+      {%- if request.page_type == 'index' -%}
+        <h1 class="visually-hidden">{{ shop.name }}</h1>
+      {%- endif -%}
       {{ content_for_layout }}
     </main>
 

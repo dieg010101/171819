@@ -199,7 +199,8 @@
   .cart {
     --cart-rule: color-mix(in srgb, var(--color-foreground) 22%, transparent);
     --cart-line: color-mix(in srgb, var(--color-foreground) 50%, transparent);
-    --cart-quiet: color-mix(in srgb, var(--color-foreground) 62%, var(--color-background));
+    /* 64%: the least that keeps quiet text at 4.5:1 with the default colours. */
+    --cart-quiet: color-mix(in srgb, var(--color-foreground) 64%, var(--color-background));
     --cart-plate: color-mix(in srgb, var(--color-background) 80%, var(--color-foreground));
     --cart-gutter: 64px;
     /* image · product · quantity · total · remove */

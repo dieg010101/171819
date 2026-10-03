@@ -400,9 +400,12 @@
   */
   .pdp {
     --pdp-ink: #fff;
-    --pdp-quiet: color-mix(in srgb, var(--pdp-ink) 42%, transparent);
+    /* 46%: the least that keeps quiet text at 4.5:1 on #1b1b1b. */
+    --pdp-quiet: color-mix(in srgb, var(--pdp-ink) 46%, transparent);
     /* The Figma's 0.15px white rules, as they actually render on #1b1b1b. */
     --pdp-hairline: color-mix(in srgb, var(--pdp-ink) 24%, transparent);
+    /* The selected value's underline is its only state cue, so it needs 3:1. */
+    --pdp-selected-line: color-mix(in srgb, var(--pdp-ink) 35%, transparent);
     /* 554 × 615: the media frame in the Figma. */
     --pdp-frame: 554 / 615;
     --pdp-line: 30px;
@@ -622,7 +625,7 @@
     position: absolute;
     inset: auto 0 1px;
     height: 1px;
-    background-color: var(--pdp-hairline);
+    background-color: var(--pdp-selected-line);
     opacity: 0;
     transition: opacity var(--pdp-ease);
   }
@@ -636,7 +639,7 @@
   }
 
   /* Sold out stays selectable (so its state can be read and announced), struck
-     through; a combination with no variant at all is fainter still. */
+     through; a combination with no variant at all has a fainter strike. */
   .pdp__value:is([data-state='soldout'], [data-state='unavailable']) {
     color: var(--pdp-quiet);
   }
@@ -647,8 +650,10 @@
     text-decoration-thickness: 1px;
   }
 
-  .pdp__value[data-state='unavailable'] {
-    opacity: 0.6;
+  /* Still selectable, so its text keeps the quiet colour's 4.5:1; only the
+     strike is fainter, and still 3:1. */
+  .pdp__value[data-state='unavailable'] .pdp__value-text {
+    text-decoration-color: color-mix(in srgb, currentcolor 76%, transparent);
   }
 
   .pdp__form {
@@ -872,6 +877,10 @@
 
     var ROOT = '[data-pdp]';
 
+    // Per section: aborted on shopify:section:unload, so a Theme Editor re-render
+    // does not leave the old section's window listeners (and timers) behind.
+    var controllers = new WeakMap();
+
     function pad(n) {
       return n < 10 ? '0' + n : String(n);
     }
@@ -891,6 +900,8 @@
       }
 
       root.dataset.pdpReady = 'true';
+      var controller = new AbortController();
+      controllers.set(root, controller);
 
       var fieldsets = Array.prototype.slice.call(root.querySelectorAll('[data-pdp-option]'));
       var select = root.querySelector('[data-pdp-variant-select]');
@@ -953,7 +964,8 @@
         window.addEventListener('resize', function () {
           clearTimeout(resizeTimer);
           resizeTimer = setTimeout(function () { showMedia(active, 'instant'); }, 150);
-        });
+        }, { signal: controller.signal });
+        controller.signal.addEventListener('abort', function () { clearTimeout(resizeTimer); });
         if (active > 0) showMedia(active, 'instant');
       }
 
@@ -1103,6 +1115,14 @@
 
     document.addEventListener('shopify:section:load', function (event) {
       initAll(event.target);
+    });
+
+    document.addEventListener('shopify:section:unload', function (event) {
+      event.target.querySelectorAll(ROOT).forEach(function (root) {
+        var controller = controllers.get(root);
+        if (controller) controller.abort();
+        controllers.delete(root);
+      });
     });
   })();
 {% endjavascript %}

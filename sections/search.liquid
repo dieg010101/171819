@@ -8,7 +8,9 @@
 <h1>{{ 'search.title' | t }}</h1>
 
 <form action="{{ routes.search_url }}" method="get" role="search">
+  <label class="visually-hidden" for="Search-{{ section.id }}">{{ 'search.placeholder' | t }}</label>
   <input
+    id="Search-{{ section.id }}"
     type="search"
     size="50"
     name="q"

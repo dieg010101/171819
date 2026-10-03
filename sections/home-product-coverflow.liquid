@@ -93,6 +93,17 @@
   {%- endif -%}
 </div>
 
+{%- comment -%}
+  The row scrolls only without JS. With JS it is replaced by the stage almost at
+  once, and a scroll container there makes Chrome report a phantom layout shift
+  (CLS ~0.12 at 1280px) when it stops scrolling, though nothing moves.
+{%- endcomment -%}
+<noscript>
+  <style>
+    .coverflow__track { overflow-x: auto; }
+  </style>
+</noscript>
+
 {% stylesheet %}
   /* The section is a flex child of <main> (a flex column; see critical.css). A full
      viewport of its own, below the header, is what keeps the footer out of the
@@ -170,7 +181,6 @@
     list-style: none;
     margin: 0;
     padding: 0 var(--page-margin);
-    overflow-x: auto;
     width: 100%;
   }
 
