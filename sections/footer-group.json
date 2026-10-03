@@ -14,7 +14,15 @@
     "footer": {
       "type": "footer",
       "settings": {
-        "show_payment_icons": true
+        "instagram_url": "",
+        "shipping_returns_url": "",
+        "contact_url": "",
+        "legal_url": "",
+        "california_privacy_url": "",
+        "show_payment_icons": true,
+        "mailing_list_image": "shopify://shop_images/IMG_2249.jpg",
+        "mailing_list_auto_open": true,
+        "mailing_list_delay": 15
       }
     }
   },

@@ -340,17 +340,31 @@
       }
 
       // Optional automatic opening: once per session, never in the theme
-      // editor, and never over the homepage's bird intro (wait it out).
+      // editor, and the full delay counted from when the page is usable, i.e.
+      // after the homepage's bird intro has gone.
       var designMode = window.Shopify && window.Shopify.designMode;
       if (dialog.dataset.autoOpen !== 'true' || designMode || isDismissed()) return;
       var delay = (Number(dialog.dataset.delay) || 15) * 1000;
-      (function schedule() {
+      afterIntro(function () {
         setTimeout(function () {
-          if (isDismissed() || !dialog.isConnected) return;
-          if (document.querySelector('[data-flock-intro]')) return schedule();
-          open(null);
+          if (!isDismissed()) open(null);
         }, delay);
-      })();
+      });
+    }
+
+    // Runs `callback` once the bird intro overlay is gone. flock-intro.js
+    // removes it on every exit path (finished, p5 failed to boot, no engine),
+    // so its absence is the signal: immediate on pages without the intro or if
+    // it already finished, otherwise as soon as it is removed.
+    function afterIntro(callback) {
+      var intro = document.querySelector('[data-flock-intro]');
+      if (!intro || !intro.parentNode) return callback();
+      var observer = new MutationObserver(function () {
+        if (intro.isConnected) return;
+        observer.disconnect();
+        callback();
+      });
+      observer.observe(intro.parentNode, { childList: true });
     }
 
     // One listener for every trigger, so a re-rendered section never leaves
