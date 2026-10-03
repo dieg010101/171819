@@ -3,9 +3,9 @@
   plain text (no cell boxes).
 
   Presentation only. It takes one normalised shape, so whatever eventually
-  supplies the guide (structured product data) only has to be mapped to it:
-  a JSON metafield or metaobject with `rows: [{ label, values: [] }]` maps with
-  `map: 'label'` and by `concat`-ing each row's values.
+  supplies the guide only has to be mapped to it: the Sanity size guide's JSON
+  `measurements: [{ label, values: [] }]` maps with `map: 'label'` and by
+  `concat`-ing each row's values.
 
   The caller decides whether a guide exists; this renders whatever it is given.
 
