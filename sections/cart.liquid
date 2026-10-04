@@ -1,6 +1,7 @@
 {% comment %}
-  Cart page: a structured list of line items (image · product · quantity ·
-  total · remove) over a summary and a full-width checkout bar.
+  Cart page: line items as compact product records (image · product · total,
+  with quantity and remove beneath) beside a summary on the site's PDP/footer
+  split, so subtotal and checkout sit on the footer's column.
 
   Commerce is the standard Shopify cart form: quantities post as `updates[]`
   to /cart, checkout is the form's `checkout` submit, and remove uses each
@@ -30,13 +31,6 @@
 
   {%- if cart.item_count > 0 -%}
     <form class="cart__form" action="{{ routes.cart_url }}" method="post" data-cart-form>
-      {%- comment -%} Column labels are visual only; each cell carries its own accessible label. {%- endcomment -%}
-      <div class="cart__cols" aria-hidden="true">
-        <span class="cart__col-label cart__col-label--product">Product</span>
-        <span class="cart__col-label cart__col-label--qty">Quantity</span>
-        <span class="cart__col-label cart__col-label--total">Total</span>
-      </div>
-
       <ul class="cart__items">
         {%- for item in cart.items -%}
           <li class="cart__item" data-cart-line="{{ item.key }}">
@@ -50,10 +44,10 @@
                 -%}
                 {{
                   item.image
-                  | image_url: width: 480
+                  | image_url: width: 300
                   | image_tag:
-                    widths: '120, 180, 240, 320, 480',
-                    sizes: '(min-width: 800px) 150px, 104px',
+                    widths: '80, 100, 160, 200, 300',
+                    sizes: '(min-width: 768px) 100px, 80px',
                     loading: loading,
                     alt: ''
                 }}
@@ -87,10 +81,10 @@
                 {%- endif -%}
               {%- endfor -%}
 
-              <p class="cart__unit">
-                <span class="cart__sr">Price</span>
-                {{ item.final_price | money_without_trailing_zeros }}
-              </p>
+              {%- comment -%} At quantity 1 the unit price is the line total, shown once. {%- endcomment -%}
+              {%- if item.quantity > 1 -%}
+                <p class="cart__unit">{{ item.final_price | money_without_trailing_zeros }} each</p>
+              {%- endif -%}
 
               {%- for allocation in item.line_level_discount_allocations -%}
                 <p class="cart__note">
@@ -189,28 +183,42 @@
     </form>
   {%- else -%}
     <div class="cart__empty">
-      <p class="cart__empty-text">Your cart is empty.</p>
-      <a class="cart__continue" href="{{ routes.all_products_collection_url }}">Continue shopping</a>
+      <p>Your cart is empty.</p>
+      <a class="cart__continue" href="{{ routes.all_products_collection_url }}">Shop</a>
     </div>
   {%- endif -%}
 </div>
 
 {% stylesheet %}
+  /* The footer follows <main>; letting <main> take the body's spare height
+     keeps it at the bottom of a short or empty cart. Long carts are unaffected. */
+  body:has(.cart) > main {
+    flex: 1 0 auto;
+  }
+
+  /* Set like the PDP and information pages: Assistant 11/15 throughout, with
+     hierarchy from placement and hairlines rather than size or weight. */
   .cart {
-    --cart-rule: color-mix(in srgb, var(--color-foreground) 22%, transparent);
-    --cart-line: color-mix(in srgb, var(--color-foreground) 50%, transparent);
+    /* White, like the PDP, collection and information pages; the theme's
+       foreground is the header's grey. */
+    --cart-ink: #fff;
     /* 64%: the least that keeps quiet text at 4.5:1 with the default colours. */
     --cart-quiet: color-mix(in srgb, var(--color-foreground) 64%, var(--color-background));
+    /* The PDP's and footer's hairline. */
+    --cart-hairline: color-mix(in srgb, var(--cart-ink) 24%, transparent);
     --cart-plate: color-mix(in srgb, var(--color-background) 80%, var(--color-foreground));
-    --cart-gutter: 64px;
-    /* image · product · quantity · total · remove */
-    --cart-cols: 150px minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) 5rem;
-    --cart-gap: 2rem;
+    --cart-line: 15px;
+    --cart-thumb: 100px;
+    --cart-item-gap: 20px;
 
-    padding: 0.5rem var(--cart-gutter) clamp(4rem, 10vh, 7rem);
-    color: var(--color-foreground);
-    font-size: 14px;
-    line-height: 1.45;
+    /* As on the information pages: the first line sits 5px under the header. */
+    padding: 5px var(--split-gutter) 0;
+    color: var(--cart-ink);
+    font-family: var(--font-secondary--family);
+    font-size: 11px;
+    font-weight: 400;
+    line-height: var(--cart-line);
+    letter-spacing: -0.05em;
   }
 
   .cart__sr {
@@ -226,8 +234,12 @@
   }
 
   .cart :is(a, button, input):focus-visible {
-    outline: 1px solid var(--color-foreground);
-    outline-offset: 3px;
+    outline: 1px solid var(--cart-ink);
+    outline-offset: 2px;
+  }
+
+  .cart p {
+    margin: 0;
   }
 
   /* --- Heading ---------------------------------------------------------- */
@@ -235,49 +247,25 @@
   .cart__head {
     display: flex;
     align-items: baseline;
-    gap: 1rem;
-    margin-bottom: 2rem;
+    gap: var(--cart-item-gap);
+    padding-bottom: var(--cart-line);
+    border-bottom: 1px solid var(--cart-hairline);
   }
 
+  /* A real h1, set in the page's own voice like the information pages' titles. */
   .cart__title {
     margin: 0;
-    font-size: 22px;
-    font-weight: 400;
-    line-height: 1.2;
-    letter-spacing: 0.08em;
+    font: inherit;
+    letter-spacing: inherit;
     text-transform: uppercase;
   }
 
   .cart__count {
-    margin: 0;
-    font-size: 12px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
     color: var(--cart-quiet);
+    font-variant-numeric: tabular-nums;
   }
 
-  /* --- Line items: one grid shared by the labels and every row ------------ */
-
-  .cart__cols,
-  .cart__item {
-    display: grid;
-    grid-template-columns: var(--cart-cols);
-    grid-template-areas: 'image info qty total remove';
-    column-gap: var(--cart-gap);
-  }
-
-  .cart__cols {
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--cart-line);
-    font-size: 11px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--cart-quiet);
-  }
-
-  .cart__col-label--product { grid-column: image / info; }
-  .cart__col-label--qty { grid-area: qty; }
-  .cart__col-label--total { grid-area: total; }
+  /* --- Line items: image beside the record, controls along its foot -------- */
 
   .cart__items {
     margin: 0;
@@ -286,18 +274,27 @@
   }
 
   .cart__item {
-    align-items: start;
-    padding: 1.5rem 0;
-    border-bottom: 1px solid var(--cart-rule);
+    display: grid;
+    grid-template-columns: var(--cart-thumb) minmax(0, 1fr) auto;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      'image info total'
+      'image qty remove';
+    column-gap: var(--cart-item-gap);
+    row-gap: var(--cart-line);
+    padding: var(--cart-line) 0;
+    border-bottom: 1px solid var(--cart-hairline);
   }
 
   .cart__image {
     grid-area: image;
+    align-self: start;
     display: block;
     background-color: var(--cart-plate);
   }
 
-  /* Natural proportions: garments are never cropped. */
+  /* Natural proportions: garments are never cropped. The image's own width and
+     height attributes reserve its box before it loads. */
   .cart__image img,
   .cart__placeholder {
     display: block;
@@ -313,42 +310,33 @@
   .cart__info {
     grid-area: info;
     display: grid;
-    gap: 0.35rem;
     align-content: start;
     min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .cart__name {
-    font-size: 16px;
-    line-height: 1.3;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    text-decoration: none;
+    justify-self: start;
     color: inherit;
+    text-decoration: none;
   }
 
   .cart__name:hover {
     text-decoration: underline;
     text-decoration-thickness: 1px;
-    text-underline-offset: 4px;
+    text-underline-offset: 2px;
   }
 
   .cart__meta {
-    display: grid;
-    gap: 0.15rem;
-    margin: 0.25rem 0 0;
+    margin: 0;
   }
 
   .cart__meta-row {
     display: flex;
-    gap: 0.75em;
-    font-size: 13px;
+    gap: 0.6em;
   }
 
   .cart__meta dt {
-    min-width: 3.5em;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
     color: var(--cart-quiet);
   }
 
@@ -357,61 +345,62 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Shopify's own message when it refuses a quantity, shown on that line. */
-  .cart__line-msg {
-    margin: 0.25rem 0 0;
-    font-size: 12px;
-    color: var(--color-foreground);
-  }
-
   .cart__unit,
   .cart__note {
-    margin: 0;
-    font-size: 13px;
     color: var(--cart-quiet);
     font-variant-numeric: tabular-nums;
   }
 
-  /* Quantity: − number + on one hairline, 44px targets without a box. */
+  /* Shopify's own message when it refuses a quantity, shown on that line. */
+  .cart__line-msg {
+    color: var(--cart-ink);
+  }
+
+  .cart__total {
+    grid-area: total;
+    display: grid;
+    justify-items: end;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cart__was {
+    color: var(--cart-quiet);
+  }
+
+  /* − 1 +, set as text like the PDP's quantity. Each control is a 24 × 27 box
+     (larger than its glyph, never shifting it); the negative margins keep the
+     row on one 15px line and the − glyph on the record's left edge. */
   .cart__qty {
     grid-area: qty;
-    display: inline-grid;
-    grid-template-columns: 44px 2.75rem 44px;
-    align-items: center;
+    align-self: end;
     justify-self: start;
-    /* Sit the numeral on the product name's line, not below it. */
-    margin-top: -0.75rem;
-    border-bottom: 1px solid var(--cart-line);
+    display: flex;
+    align-items: center;
+    margin: -6px 0 -6px -9px;
   }
 
-  .cart__qty-btn {
-    height: 44px;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: inherit;
-    font: inherit;
-    font-size: 16px;
-    line-height: 1;
-    cursor: pointer;
-  }
-
-  .cart__qty-btn:hover {
-    color: var(--color-foreground);
-    background-color: color-mix(in srgb, var(--color-foreground) 8%, transparent);
-  }
-
+  .cart__qty-btn,
   .cart__qty-input {
-    width: 100%;
-    height: 44px;
+    height: 27px;
     padding: 0;
     border: 0;
     border-radius: 0;
     background: none;
     color: inherit;
-    font-size: 15px;
-    font-variant-numeric: tabular-nums;
+    font: inherit;
+    letter-spacing: inherit;
+  }
+
+  .cart__qty-btn {
+    width: 24px;
+    cursor: pointer;
+  }
+
+  .cart__qty-input {
+    width: 2.5em;
     text-align: center;
+    font-variant-numeric: tabular-nums;
     appearance: textfield;
     -moz-appearance: textfield;
   }
@@ -427,66 +416,46 @@
     visibility: hidden;
   }
 
-  .cart__total {
-    grid-area: total;
-    display: grid;
-    gap: 0.15rem;
-    margin: 0;
-    font-size: 16px;
-    line-height: 1.3;
-    font-variant-numeric: tabular-nums;
+  /* Text links and text buttons share one treatment; the padding and negative
+     margin grow the hit area to 27px without moving the text. */
+  .cart__remove,
+  .cart__update,
+  .cart__continue {
+    padding: 6px 0;
+    margin: -6px 0;
+    color: var(--cart-quiet);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
   }
 
-  .cart__was {
-    font-size: 13px;
-    color: var(--cart-quiet);
+  .cart__remove:hover,
+  .cart__update:hover,
+  .cart__continue:hover {
+    color: var(--cart-ink);
   }
 
   .cart__remove {
     grid-area: remove;
+    align-self: end;
     justify-self: end;
-    /* 44px target around a small label. */
-    margin: -0.8rem 0 0;
-    padding: 0.8rem 0;
-    font-size: 11px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--cart-quiet);
-    text-decoration: underline;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 4px;
-  }
-
-  .cart__remove:hover {
-    color: var(--color-foreground);
   }
 
   /* --- Summary and checkout ---------------------------------------------- */
 
   .cart__summary {
     display: grid;
-    grid-template-columns: var(--cart-cols);
-    column-gap: var(--cart-gap);
-    padding-top: 1.25rem;
-  }
-
-  .cart__summary > * {
-    grid-column: 1 / -1;
+    align-content: start;
+    padding-top: var(--cart-line);
   }
 
   .cart__update {
     justify-self: start;
-    min-height: 44px;
-    margin-bottom: 1rem;
-    padding: 0 1rem;
-    border: 1px solid var(--cart-line);
-    border-radius: 0;
+    margin-bottom: calc(var(--cart-line) - 6px);
+    border: 0;
     background: none;
-    color: inherit;
     font: inherit;
-    font-size: 12px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+    letter-spacing: inherit;
     cursor: pointer;
   }
 
@@ -494,67 +463,46 @@
     display: none;
   }
 
-  /* Label under the product column, figure under the Total column, so the
-     summary reads as the table's last row. */
   .cart__summary-row {
-    display: grid;
-    grid-template-columns: subgrid;
-    margin: 0;
-    font-size: 14px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    gap: var(--cart-item-gap);
     font-variant-numeric: tabular-nums;
   }
 
-  /* Numeric lines: the summary shares the columns but not the named areas. */
-  .cart__summary-row > :first-child {
-    grid-column: 1 / 3;
-  }
-
-  .cart__summary-row > :last-child {
-    grid-column: 4 / 5;
-  }
-
-  .cart__summary-row--discount {
-    color: var(--cart-quiet);
-    margin-bottom: 0.5rem;
-  }
-
-  .cart__subtotal {
-    font-size: 18px;
-    letter-spacing: 0.06em;
-  }
-
+  .cart__summary-row--discount,
   .cart__tax {
-    margin: 0.4rem 0 1.5rem;
-    font-size: 12px;
     color: var(--cart-quiet);
   }
 
-  /* The page's one assertive element: a full-width inverted bar. */
+  /* The PDP's Add to Cart capsule: 19px tall and kept thin on purpose, with the
+     hit area grown invisibly instead. */
   .cart__checkout {
+    position: relative;
+    display: block;
     width: 100%;
-    height: 60px;
+    height: 19px;
+    margin-top: 21px;
     padding: 0 1rem;
-    border: 1px solid var(--color-foreground);
-    border-radius: 0;
-    background-color: var(--color-foreground);
-    color: var(--color-background);
+    border: 1px solid var(--cart-hairline);
+    border-radius: 9.5px;
+    background: none;
+    color: inherit;
     font: inherit;
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
+    line-height: 12px;
+    letter-spacing: inherit;
     cursor: pointer;
-    transition: background-color 150ms ease;
+    transition: border-color 200ms ease;
+  }
+
+  .cart__checkout::before {
+    content: '';
+    position: absolute;
+    inset: -12px -1px;
   }
 
   .cart__checkout:hover {
-    background-color: color-mix(in srgb, var(--color-foreground) 86%, var(--color-background));
-  }
-
-  .cart__checkout:active {
-    transform: translateY(1px);
+    border-color: var(--cart-ink);
   }
 
   /* --- Empty ------------------------------------------------------------- */
@@ -562,123 +510,57 @@
   .cart__empty {
     display: grid;
     justify-items: start;
-    gap: 1.5rem;
-    padding: 2.5rem 0 4rem;
-    border-top: 1px solid var(--cart-line);
-  }
-
-  .cart__empty-text {
-    margin: 0;
-    font-size: 16px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    padding-top: var(--cart-line);
   }
 
   .cart__continue {
-    display: grid;
-    place-items: center;
-    width: min(100%, 22rem);
-    height: 56px;
-    border: 1px solid var(--color-foreground);
-    font-size: 14px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    text-decoration: none;
-    color: inherit;
-    transition:
-      background-color 150ms ease,
-      color 150ms ease;
+    margin-top: calc(var(--cart-line) - 6px);
   }
 
-  .cart__continue:hover {
-    background-color: var(--color-foreground);
-    color: var(--color-background);
-  }
+  /* --- Two columns: items · summary, on the PDP/footer split --------------- */
 
-  /* --- Tablet and phone: each item stacks beside its image ----------------- */
-
-  @media (max-width: 899px) {
+  @media (min-width: 768px) {
     .cart {
-      --cart-cols: 120px minmax(0, 1fr) auto;
-      --cart-gap: 1.25rem;
+      display: grid;
+      grid-template-columns: var(--split-columns);
+      grid-template-rows: auto 1fr;
+      column-gap: var(--split-gap);
+      align-items: start;
+      /* As the footer: past ~1920px the composition stops widening and centres. */
+      width: 100%;
+      max-width: calc(var(--split-max) + 2 * var(--split-gutter));
+      margin-inline: auto;
     }
 
-    .cart__cols {
-      grid-template-areas: 'product product product';
+    .cart__head,
+    .cart__items,
+    .cart__empty {
+      grid-column: 1;
     }
 
-    .cart__col-label--qty,
-    .cart__col-label--total {
-      display: none;
+    /* The form adds no box, so the items and summary sit on the cart's grid. */
+    .cart__form {
+      display: contents;
     }
 
-    .cart__col-label--product {
-      grid-column: 1 / -1;
-    }
-
-    .cart__item {
-      grid-template-areas:
-        'image info info'
-        'image qty total'
-        'image remove remove';
-      row-gap: 0.75rem;
-    }
-
-    .cart__qty {
-      margin-top: 0.25rem;
-    }
-
-    .cart__total {
-      align-self: center;
-      justify-items: end;
-      text-align: right;
-    }
-
-    .cart__remove {
-      justify-self: start;
-      margin: -0.5rem 0 -0.8rem;
-    }
-
-    .cart__summary-row > :first-child {
-      grid-column: 1 / 3;
-    }
-
-    .cart__summary-row > :last-child {
-      grid-column: 3;
-      text-align: right;
+    /* Its rule continues the heading's across the split, and the subtotal
+       lines up with the first item. */
+    .cart__summary {
+      grid-column: 2;
+      grid-row: 2;
+      /* Overlaps the heading's rule rather than drawing a second one under it. */
+      margin-top: -1px;
+      border-top: 1px solid var(--cart-hairline);
     }
   }
 
   @media (max-width: 700px) {
-    /* Matches the header's own 20px inset at this width. */
+    /* The header's own 20px inset at this width, as on the information pages. */
     .cart {
-      --cart-gutter: 20px;
-      --cart-cols: 96px minmax(0, 1fr) auto;
-      --cart-gap: 1rem;
-    }
+      --cart-thumb: 80px;
+      --cart-item-gap: 15px;
 
-    .cart__head {
-      margin-bottom: 1.25rem;
-    }
-
-    .cart__title {
-      font-size: 18px;
-    }
-
-    .cart__name {
-      font-size: 14px;
-    }
-
-    .cart__item {
-      padding: 1.25rem 0;
-    }
-
-    .cart__subtotal {
-      font-size: 16px;
-    }
-
-    .cart__checkout {
-      height: 56px;
+      padding-top: 20px;
     }
   }
 
