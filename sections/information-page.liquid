@@ -1,0 +1,115 @@
+{% comment %}
+  Information page (Shipping & Returns, Contact, Legal, California Privacy, …):
+  the page's own title and rich text, set as one compact 11/15 column from the
+  1280px Figma. All copy is the Page's, edited in Shopify Admin; nothing is
+  written here. Used by templates/page.information.json.
+{% endcomment %}
+
+{%- assign title_id = 'InformationPageTitle-' | append: section.id -%}
+
+<article class="information-page full-width" aria-labelledby="{{ title_id }}">
+  <div class="information-page__content">
+    <h1 class="information-page__title" id="{{ title_id }}">{{ page.title | escape }}</h1>
+
+    <div class="information-page__richtext">
+      {{ page.content }}
+    </div>
+  </div>
+</article>
+
+{% stylesheet %}
+  /* The footer follows <main>; letting <main> take the body's spare height
+     keeps it at the bottom of a short page. Long pages are unaffected. */
+  body:has(.information-page) > main {
+    flex: 1 0 auto;
+  }
+
+  .information-page {
+    /* The one gap on these pages, after the title and between blocks. None:
+       the Figma's 405px Shipping block is its 27 lines set solid on the 15px
+       grid. */
+    --information-gap: 0;
+
+    /* The header is 158px tall; the Figma's text starts at 163. */
+    padding: 5px var(--split-gutter) 0;
+    color: #fff;
+    font-family: var(--font-secondary--family);
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 15px;
+    letter-spacing: -0.05em;
+    /* Long email addresses and URLs break rather than widen the column. */
+    overflow-wrap: anywhere;
+  }
+
+  .information-page__content {
+    max-width: 393px;
+    min-width: 0;
+  }
+
+  /* Headings keep their meaning, not the browser's size or weight. :where()
+     keeps these resets below the spacing rules that follow. */
+  .information-page :where(h1, h2, h3, h4, h5, h6) {
+    margin: 0;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: uppercase;
+  }
+
+  .information-page__title {
+    margin-bottom: var(--information-gap);
+  }
+
+  .information-page__richtext :where(p, ul, ol, h2, h3, h4, h5, h6, blockquote, table) {
+    margin: 0;
+  }
+
+  /* The gap between blocks; never between a heading and what it heads. */
+  .information-page__richtext > * + * {
+    margin-top: var(--information-gap);
+  }
+
+  .information-page__richtext > :is(h2, h3, h4, h5, h6) + * {
+    margin-top: 0;
+  }
+
+  /* Body blocks under the same heading keep one blank line between them, so
+     consecutive paragraphs and lists never read as one. */
+  .information-page__richtext > :is(p, ul, ol, blockquote) + :is(p, ul, ol, blockquote) {
+    margin-top: 15px;
+  }
+
+  .information-page__richtext :is(ul, ol) {
+    padding-left: 1.5em;
+  }
+
+  .information-page a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+  }
+
+  .information-page a:hover {
+    text-decoration-thickness: 2px;
+  }
+
+  .information-page a:focus-visible {
+    outline: 1px solid currentcolor;
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 700px) {
+    /* The header's own 20px inset at this width, which is also the gutter. */
+    .information-page {
+      padding-top: 20px;
+    }
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Information page",
+  "settings": []
+}
+{% endschema %}
