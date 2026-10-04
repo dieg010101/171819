@@ -97,6 +97,24 @@ p:empty {
   }
 }
 
+/* The page's own scrollbar. `stable` keeps its gutter reserved whether or not
+   the page overflows, and while a dialog or the intro holds the page at
+   overflow: hidden, so classic scrollbars never change the layout width.
+   Only the scrollbar's side: `both-edges` would pad the left too and move the
+   Figma-measured gutters. Overlay scrollbars reserve nothing. */
+html {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  /* ~3.2:1 thumb on a track that disappears into the page. */
+  scrollbar-color: #6b6b6b var(--color-background);
+}
+
+@media (forced-colors: active) {
+  html {
+    scrollbar-color: auto;
+  }
+}
+
 body {
   font-family: var(--font-primary--family);
   background-color: var(--color-background);
