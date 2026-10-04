@@ -1,6 +1,7 @@
 {% comment %}
-  Collection / shop index: category menu, a one-line utility bar (count ·
-  filter · sort), then an image-led product grid with Shopify pagination.
+  Collection / shop index: an image-led product grid with Shopify pagination,
+  optionally headed by the category menu and a one-line utility bar (count ·
+  filter · sort) — see `show_bar` below.
 
   Everything is server-rendered: products come from `collection.products`
   inside `paginate`, sorting and filtering are a plain GET form using
@@ -25,10 +26,22 @@
       assign active_filter_count = active_filter_count | plus: filter.active_values.size
     endif
   endfor
+
+  # The design is just the grid. The bar returns when the merchant asks for it,
+  # picks a category menu, or a filtered URL needs its way back out.
+  assign show_bar = section.settings.show_bar
+  if menu != blank or active_filter_count > 0
+    assign show_bar = true
+  endif
 -%}
 
 <div class="shop full-width" data-shop>
   {%- paginate collection.products by 24 -%}
+    {%- unless show_bar -%}
+      <h1 class="shop__sr">{{ collection.title }}</h1>
+    {%- endunless -%}
+
+    {%- if show_bar -%}
     <div class="shop__bar">
       {%- if menu != blank and menu.links.size > 0 -%}
         {%- comment -%} The menu shows where you are; the page still needs its heading. {%- endcomment -%}
@@ -200,6 +213,7 @@
         </ul>
       {%- endif -%}
     </div>
+    {%- endif -%}
 
     {%- if collection.description != blank -%}
       <div class="shop__description">{{ collection.description }}</div>
@@ -209,9 +223,9 @@
       <ul class="shop__grid">
         {%- for product in collection.products -%}
           {%- liquid
-            # Roughly the first row at the widest layout is above the fold.
+            # The first row (three across on desktop) is above the fold.
             assign loading = 'lazy'
-            if forloop.index <= 5
+            if forloop.index <= 3
               assign loading = 'eager'
             endif
             # The first card is the measured LCP image at phone and desktop widths.
@@ -235,11 +249,11 @@
                 {%- if primary -%}
                   {{
                     primary
-                    | image_url: width: 960
+                    | image_url: width: 1200
                     | image_tag:
                       class: 'shop__img',
-                      widths: '240, 360, 480, 640, 800, 960',
-                      sizes: '(min-width: 1880px) calc((100vw - 128px) / 5), (min-width: 1100px) calc((100vw - 128px) / 4), (min-width: 701px) calc((100vw - 128px) / 3), calc((100vw - 40px) / 2)',
+                      widths: '240, 360, 480, 640, 800, 960, 1200',
+                      sizes: '(min-width: 701px) calc((100vw - 185px) / 3), calc((100vw - 48px) / 2)',
                       loading: loading,
                       fetchpriority: priority,
                       alt: primary.alt | default: product.title
@@ -253,11 +267,11 @@
                   <template data-shop-alt>
                     {{
                       secondary
-                      | image_url: width: 960
+                      | image_url: width: 1200
                       | image_tag:
                         class: 'shop__img shop__img--alt',
-                        widths: '240, 360, 480, 640, 800, 960',
-                        sizes: '(min-width: 1880px) calc((100vw - 128px) / 5), (min-width: 1100px) calc((100vw - 128px) / 4), (min-width: 701px) calc((100vw - 128px) / 3), calc((100vw - 40px) / 2)',
+                        widths: '240, 360, 480, 640, 800, 960, 1200',
+                        sizes: '(min-width: 701px) calc((100vw - 185px) / 3), calc((100vw - 48px) / 2)',
                         alt: ''
                     }}
                   </template>
@@ -270,15 +284,16 @@
                   {%- if product.compare_at_price > product.price -%}
                     <span class="shop__sr">Sale price</span>
                   {%- endif -%}
+                  {%- comment -%} Same money formats as the PDP: currency on the price, not repeated on the strikethrough. {%- endcomment -%}
                   {%- if product.price_varies -%}
-                    {{ product.price_min | money_without_trailing_zeros }}–{{ product.price_max | money_without_trailing_zeros }}
+                    {{ product.price_min | money }}–{{ product.price_max | money_with_currency }}
                   {%- else -%}
-                    {{ product.price | money_without_trailing_zeros }}
+                    {{ product.price | money_with_currency }}
                   {%- endif -%}
                   {%- if product.compare_at_price > product.price -%}
                     <s class="shop__was">
                       <span class="shop__sr">Regular price</span>
-                      {{ product.compare_at_price | money_without_trailing_zeros }}
+                      {{ product.compare_at_price | money }}
                     </s>
                   {%- endif -%}
                   {%- unless product.available -%}
@@ -340,11 +355,13 @@
     /* 64%: the least that keeps quiet text at 4.5:1 with the default colours. */
     --shop-quiet: color-mix(in srgb, var(--color-foreground) 64%, var(--color-background));
     --shop-rule: color-mix(in srgb, var(--color-foreground) 22%, transparent);
-    /* Same outer inset as the header, so the grid hangs from SHOP and CART. */
-    --shop-gutter: 64px;
-    --shop-cols: 4;
+    /* The 1280 Figma: 3 × 365 columns and 2 × 30 gaps leave 62.5px a side. */
+    --shop-gutter: 62.5px;
+    --shop-cols: 3;
 
-    padding: 0.25rem var(--shop-gutter) clamp(4rem, 10vh, 7rem);
+    /* The header is 158px tall; the first row starts at 165. Below, 2px plus
+       the footer's own gap puts its first row 118px under the last images. */
+    padding: 7px var(--shop-gutter) 2px;
     color: var(--color-foreground);
     font-size: 12px;
     line-height: 1.4;
@@ -673,8 +690,9 @@
   .shop__grid {
     display: grid;
     grid-template-columns: repeat(var(--shop-cols), minmax(0, 1fr));
-    column-gap: clamp(0.5rem, 1vw, 1rem);
-    row-gap: clamp(2rem, 3.5vw, 3.5rem);
+    column-gap: 30px;
+    /* With the two metadata lines, row tops land 590px apart at 1280. */
+    row-gap: 37px;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -686,17 +704,17 @@
     text-decoration: none;
   }
 
-  /* A flat 3:4 field; photographs are contained, never cropped. */
+  /* The Figma's 365 × 501 frame; photographs fill it edge to edge. */
   .shop__media {
     position: relative;
-    aspect-ratio: 3 / 4;
+    aspect-ratio: 365 / 501;
   }
 
   .shop__img {
     display: block;
     width: 100%;
     height: 100%;
-    object-fit: contain;
+    object-fit: cover;
   }
 
   .shop__placeholder {
@@ -717,22 +735,26 @@
     }
   }
 
+  /* Title and price sit 19px apart, centred where the Figma's 30px line
+     boxes put them, without carrying those boxes' empty height. */
   .shop__meta {
     display: grid;
-    gap: 0.15rem;
-    padding-top: 0.6rem;
+    min-width: 0;
+    padding-top: 14px;
+    color: #fff;
+    font-family: var(--font-secondary--family);
+    font-weight: 400;
   }
 
   .shop__title,
   .shop__price {
     margin: 0;
-    font-size: 12px;
-    line-height: 1.35;
+    font-size: 11px;
+    line-height: 19px;
   }
 
   .shop__title {
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    letter-spacing: -0.05em;
   }
 
   .shop__link:hover .shop__title {
@@ -747,7 +769,6 @@
     align-items: baseline;
     gap: 0 0.6em;
     font-variant-numeric: tabular-nums;
-    color: var(--shop-quiet);
   }
 
   .shop__was {
@@ -755,7 +776,7 @@
   }
 
   .shop__soldout {
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--color-foreground);
@@ -823,24 +844,16 @@
 
   /* --- Columns ---------------------------------------------------------------- */
 
-  /* Five columns only where each photograph still stays larger than at 1440. */
-  @media (min-width: 1880px) {
-    .shop {
-      --shop-cols: 5;
-    }
-  }
-
-  @media (max-width: 1099px) {
-    .shop {
-      --shop-cols: 3;
-    }
-  }
-
   @media (max-width: 700px) {
     /* Matches the header's own 20px inset at this width. */
     .shop {
       --shop-gutter: 20px;
       --shop-cols: 2;
+    }
+
+    .shop__grid {
+      column-gap: 8px;
+      row-gap: 32px;
     }
 
     /* Count joins the category row; filter and sort share the row below. */
@@ -985,6 +998,13 @@
 {
   "name": "t:general.collection",
   "settings": [
+    {
+      "type": "checkbox",
+      "id": "show_bar",
+      "label": "Show title, product count, filter and sort",
+      "info": "Always shown when Shop categories is set or filters are applied.",
+      "default": false
+    },
     {
       "type": "link_list",
       "id": "category_menu",
