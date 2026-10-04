@@ -22,7 +22,7 @@
         "show_payment_icons": true,
         "mailing_list_image": "shopify://shop_images/IMG_2249.jpg",
         "mailing_list_auto_open": true,
-        "mailing_list_delay": 15
+        "mailing_list_delay": 5
       }
     }
   },
