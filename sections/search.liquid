@@ -1,66 +1,447 @@
 {% comment %}
-  This section is used in the search template to render search results for
-  products, articles, and pages.
+  Search page: Shopify's own search, rendered server-side. Shopify runs the
+  query, ranks the results (products, pages, articles) and paginates them; this
+  section only presents them in the collection's voice: products as image
+  cards, other results as one-line text records naming their type.
+
+  The query reaches every message through plain (non-`_html`) translation
+  keys, so Shopify escapes it and it can only ever render as text.
 
   https://shopify.dev/docs/storefronts/themes/architecture/templates/search
 {% endcomment %}
 
-<h1>{{ 'search.title' | t }}</h1>
+<div class="search-page full-width">
+  <h1 class="search-page__title">{{ 'search.title' | t }}</h1>
 
-<form action="{{ routes.search_url }}" method="get" role="search">
-  <label class="visually-hidden" for="Search-{{ section.id }}">{{ 'search.placeholder' | t }}</label>
-  <input
-    id="Search-{{ section.id }}"
-    type="search"
-    size="50"
-    name="q"
-    value="{{ search.terms | escape }}"
-    placeholder="{{ 'search.placeholder' | t }}"
-  >
-  <button type="submit">{{ 'search.submit' | t }}</button>
-</form>
+  <form class="search-page__form" action="{{ routes.search_url }}" method="get" role="search">
+    <label class="search-page__sr" for="Search-{{ section.id }}">{{ 'search.placeholder' | t }}</label>
+    <input
+      class="search-page__input"
+      id="Search-{{ section.id }}"
+      type="search"
+      name="q"
+      value="{{ search.terms | escape }}"
+      placeholder="{{ 'search.placeholder' | t }}"
+    >
+    <button class="search-page__submit" type="submit">{{ 'search.submit' | t }}</button>
+  </form>
 
-{% if search.performed %}
-  {% if search.results_count == 0 %}
-    <p>{{ 'search.no_results_html' | t: terms: search.terms }}</p>
-  {% else %}
-    <p>{{ 'search.results_for_html' | t: terms: search.terms, count: search.results_count }}</p>
+  {%- comment -%} An empty `q` is not a performed search, so it shows the initial state, not "no results". {%- endcomment -%}
+  {%- if search.performed -%}
+    {%- if search.results_count == 0 -%}
+      <div class="search-page__empty">
+        <p class="search-page__status">{{ 'search.no_results' | t: terms: search.terms }}</p>
+        <a class="search-page__shop" href="{{ routes.all_products_collection_url }}">{{ 'search.shop' | t }}</a>
+      </div>
+    {%- else -%}
+      <p class="search-page__status">
+        {{ 'search.results_for' | t: count: search.results_count, terms: search.terms }}
+      </p>
 
-    <div class="search-results">
-      {% paginate search.results by 20 %}
-        {% # Search result items may be an article, a page, or a product. %}
-        {% for result in search.results %}
-          <div class="search-result">
-            {% assign featured_image = result.featured_image | default: result.image %}
-            {% if featured_image %}
-              {% render 'image', class: 'search-result__image', image: featured_image, url: result.url, width: 400 %}
-            {% endif %}
-            <div class="search-result__content">
-              <p>
-                {{ result.title | link_to: result.url }}
-                {% if result.price %}
-                  {{ result.price | money_with_currency }}
-                {% endif %}
-              </p>
-            </div>
-          </div>
-        {% endfor %}
+      {%- paginate search.results by 20 -%}
+        <ul class="search-page__results">
+          {%- for result in search.results -%}
+            {%- if result.object_type == 'product' -%}
+              {%- liquid
+                # The first row (three across on desktop) is above the fold.
+                assign loading = 'lazy'
+                if forloop.index <= 3 and paginate.current_page == 1
+                  assign loading = 'eager'
+                endif
+              -%}
+              <li class="search-page__item search-page__item--product">
+                <a class="search-page__link" href="{{ result.url }}">
+                  <span class="search-page__media">
+                    {%- if result.featured_image -%}
+                      {%- comment -%} Decorative: the title beside it names the link. {%- endcomment -%}
+                      {{
+                        result.featured_image
+                        | image_url: width: 1200
+                        | image_tag:
+                          class: 'search-page__img',
+                          widths: '240, 360, 480, 640, 800, 960, 1200',
+                          sizes: '(min-width: 701px) calc((100vw - 188px) / 3), calc((100vw - 48px) / 2)',
+                          loading: loading,
+                          alt: ''
+                      }}
+                    {%- endif -%}
+                  </span>
 
-        {{ paginate | default_pagination }}
-      {% endpaginate %}
-    </div>
-  {% endif %}
-{% endif %}
+                  <span class="search-page__meta">
+                    <span class="search-page__name">{{ result.title | escape }}</span>
+                    <span class="search-page__price">
+                      {%- if result.compare_at_price > result.price -%}
+                        <span class="search-page__sr">Sale price</span>
+                      {%- endif -%}
+                      {%- if result.price_varies -%}
+                        {{ result.price_min | money }}–{{ result.price_max | money_with_currency }}
+                      {%- else -%}
+                        {{ result.price | money_with_currency }}
+                      {%- endif -%}
+                      {%- if result.compare_at_price > result.price -%}
+                        <s class="search-page__was">
+                          <span class="search-page__sr">Regular price</span>
+                          {{ result.compare_at_price | money }}
+                        </s>
+                      {%- endif -%}
+                      {%- unless result.available -%}
+                        <span class="search-page__soldout">{{ 'search.sold_out' | t }}</span>
+                      {%- endunless -%}
+                    </span>
+                  </span>
+                </a>
+              </li>
+            {%- else -%}
+              {%- assign type_key = 'search.types.' | append: result.object_type -%}
+              <li class="search-page__item search-page__item--text">
+                <a class="search-page__link search-page__record" href="{{ result.url }}">
+                  <span class="search-page__type">{{ type_key | t }}</span>
+                  <span class="search-page__name">{{ result.title | escape }}</span>
+                </a>
+              </li>
+            {%- endif -%}
+          {%- endfor -%}
+        </ul>
+
+        {%- if paginate.pages > 1 -%}
+          <nav class="search-page__pages" aria-label="Pagination">
+            {%- if paginate.previous -%}
+              <a class="search-page__page search-page__page--step" href="{{ paginate.previous.url }}">Previous</a>
+            {%- endif -%}
+            <ol class="search-page__page-list">
+              {%- for part in paginate.parts -%}
+                <li>
+                  {%- if part.is_link -%}
+                    <a class="search-page__page" href="{{ part.url }}">{{ part.title }}</a>
+                  {%- elsif part.title == paginate.current_page -%}
+                    <span class="search-page__page" aria-current="page">{{ part.title }}</span>
+                  {%- else -%}
+                    <span class="search-page__page">{{ part.title }}</span>
+                  {%- endif -%}
+                </li>
+              {%- endfor -%}
+            </ol>
+            {%- if paginate.next -%}
+              <a class="search-page__page search-page__page--step" href="{{ paginate.next.url }}">Next</a>
+            {%- endif -%}
+          </nav>
+        {%- endif -%}
+      {%- endpaginate -%}
+    {%- endif -%}
+  {%- endif -%}
+</div>
 
 {% stylesheet %}
-  .search-results {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  /* The footer follows <main>; letting <main> take the body's spare height
+     keeps it at the bottom of a short search page. Long pages are unaffected. */
+  body:has(.search-page) > main {
+    flex: 1 0 auto;
   }
-  .search-results .prev,
-  .search-results .page,
-  .search-results .next {
+
+  /* Set like the cart and information pages: Assistant 11/15 in white, with
+     results in the collection's card language. */
+  .search-page {
+    /* 64%: the least that keeps quiet text at 4.5:1 with the default colours. */
+    --search-quiet: color-mix(in srgb, var(--color-foreground) 64%, var(--color-background));
+    /* The PDP's and footer's hairline. */
+    --search-hairline: color-mix(in srgb, #fff 24%, transparent);
+    --search-plate: color-mix(in srgb, var(--color-background) 80%, var(--color-foreground));
+    --search-line: 15px;
+    --search-cols: 3;
+
+    /* As on the information pages: the first line sits 5px under the header. */
+    padding: 5px var(--split-gutter) 0;
+    color: #fff;
+    font-family: var(--font-secondary--family);
+    font-size: 11px;
+    font-weight: 400;
+    line-height: var(--search-line);
+    letter-spacing: -0.05em;
+    /* Long queries and titles break rather than widen the page. */
+    overflow-wrap: anywhere;
+  }
+
+  .search-page__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .search-page :is(a, button, input):focus-visible {
+    outline: 1px solid #fff;
+    outline-offset: 2px;
+  }
+
+  /* :where() keeps this reset below the spacing rules that follow. */
+  .search-page :where(p) {
+    margin: 0;
+  }
+
+  /* A real h1, set in the page's own voice like the cart's. */
+  .search-page__title {
+    margin: 0;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: uppercase;
+  }
+
+  /* --- Form: a hairline field with a text button, like the footer's ------- */
+
+  .search-page__form {
+    display: flex;
+    align-items: flex-end;
+    gap: 20px;
+    max-width: 393px;
+    margin-top: var(--search-line);
+  }
+
+  .search-page__input {
+    flex: 1;
+    min-width: 0;
+    height: 27px;
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid var(--search-hairline);
+    border-radius: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    transition: border-color 150ms ease;
+  }
+
+  .search-page__input::placeholder {
+    color: var(--search-quiet);
+    opacity: 1;
+  }
+
+  .search-page__input:hover,
+  .search-page__input:focus {
+    border-bottom-color: #fff;
+  }
+
+  /* Text links and buttons share one treatment; the padding and negative
+     margin grow the hit area to 27px without moving the text. */
+  .search-page__submit,
+  .search-page__shop {
+    padding: 6px 0;
+    margin: -6px 0;
+    color: var(--search-quiet);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+  }
+
+  .search-page__submit {
+    /* Sits on the field's baseline rather than the -6px margin's. */
+    margin-bottom: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+  }
+
+  .search-page__submit:hover,
+  .search-page__shop:hover {
+    color: #fff;
+  }
+
+  /* --- Status and recovery ------------------------------------------------ */
+
+  .search-page__status,
+  .search-page__empty {
+    margin-top: calc(2 * var(--search-line));
+  }
+
+  /* Repeated because critical.css gives every <p> `break-word`, which would
+     let an unbroken query widen the page. */
+  .search-page__status {
+    overflow-wrap: anywhere;
+  }
+
+  .search-page__empty {
+    display: grid;
+    justify-items: start;
+  }
+
+  /* The wrapper carries the space; its message starts it. */
+  .search-page__empty > .search-page__status {
+    margin-top: 0;
+  }
+
+  .search-page__shop {
+    margin-top: calc(var(--search-line) - 6px);
+  }
+
+  /* --- Results: the collection's grid ------------------------------------- */
+
+  .search-page__results {
+    display: grid;
+    grid-template-columns: repeat(var(--search-cols), minmax(0, 1fr));
+    column-gap: 30px;
+    margin: var(--search-line) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .search-page__link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* The collection's row gap follows each product card; text records stack
+     as a tight list and only open up again before a product. */
+  .search-page__item--product {
+    padding-bottom: 37px;
+  }
+
+  .search-page__item--text {
     grid-column: 1 / -1;
+  }
+
+  .search-page__item--text:has(+ .search-page__item--product) {
+    padding-bottom: 37px;
+  }
+
+  /* The collection's 365 × 501 frame; photographs fill it edge to edge. A
+     product without an image keeps the frame, quietly filled. */
+  .search-page__media {
+    display: block;
+    aspect-ratio: 365 / 501;
+    background-color: var(--search-plate);
+  }
+
+  .search-page__img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Title and price on the collection's 19px lines, 14px under the image. */
+  .search-page__meta {
+    display: grid;
+    padding-top: 14px;
+    line-height: 19px;
+  }
+
+  .search-page__price {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 0.6em;
+    letter-spacing: normal;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .search-page__was {
+    color: var(--search-quiet);
+  }
+
+  /* As on the collection: words, not colour, carry the state. */
+  .search-page__soldout {
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  /* Page · Shipping & Returns: the type in a fixed quiet column. */
+  .search-page__record {
+    display: inline-grid;
+    grid-template-columns: 5rem minmax(0, 1fr);
+    column-gap: 20px;
+    line-height: 19px;
+  }
+
+  .search-page__type {
+    color: var(--search-quiet);
+  }
+
+  .search-page__link:hover .search-page__name {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  /* --- Pagination: the collection's ---------------------------------------- */
+
+  .search-page__pages {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1.5rem;
+    margin-top: clamp(3rem, 6vw, 5rem);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .search-page__page-list {
+    display: flex;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .search-page__page {
+    display: grid;
+    place-items: center;
+    min-width: 44px;
+    min-height: 44px;
+    color: var(--search-quiet);
+    text-decoration: none;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .search-page__page:hover,
+  .search-page__page[aria-current='page'] {
+    color: #fff;
+  }
+
+  .search-page__page[aria-current='page'] {
+    text-decoration: underline;
+    text-underline-offset: 5px;
+  }
+
+  .search-page__page--step {
+    min-width: 0;
+  }
+
+  @media (max-width: 700px) {
+    /* The header's own 20px inset at this width, as on the information pages. */
+    .search-page {
+      --search-cols: 2;
+
+      padding-top: 20px;
+    }
+
+    .search-page__form {
+      max-width: none;
+    }
+
+    .search-page__results {
+      column-gap: 8px;
+    }
+
+    .search-page__item--product,
+    .search-page__item--text:has(+ .search-page__item--product) {
+      padding-bottom: 32px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .search-page *,
+    .search-page *::before,
+    .search-page *::after {
+      transition-duration: 1ms !important;
+    }
   }
 {% endstylesheet %}
 
