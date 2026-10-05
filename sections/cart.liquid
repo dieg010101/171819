@@ -1,7 +1,8 @@
 {% comment %}
-  Cart page: line items as compact product records (image · product · total,
-  with quantity and remove beneath) beside a summary on the site's PDP/footer
-  split, so subtotal and checkout sit on the footer's column.
+  Cart page: line items as product records (a large image beside product ·
+  total, with quantity and remove beneath), separated by space rather than
+  rules. From 1100px the summary sits beside them on the site's PDP/footer
+  split, so subtotal and checkout share the footer's column.
 
   Commerce is the standard Shopify cart form: quantities post as `updates[]`
   to /cart, checkout is the form's `checkout` submit, and remove uses each
@@ -38,16 +39,16 @@
               {%- if item.image -%}
                 {%- liquid
                   assign loading = 'lazy'
-                  if forloop.index <= 3
+                  if forloop.first
                     assign loading = 'eager'
                   endif
                 -%}
                 {{
                   item.image
-                  | image_url: width: 300
+                  | image_url: width: 600
                   | image_tag:
-                    widths: '80, 100, 160, 200, 300',
-                    sizes: '(min-width: 768px) 100px, 80px',
+                    widths: '120, 160, 180, 200, 240, 300, 400, 500, 600',
+                    sizes: '(min-width: 1100px) 200px, (min-width: 701px) 180px, (min-width: 445px) 160px, (max-width: 333px) 120px, 36vw',
                     loading: loading,
                     alt: ''
                 }}
@@ -208,8 +209,10 @@
     --cart-hairline: color-mix(in srgb, var(--cart-ink) 24%, transparent);
     --cart-plate: color-mix(in srgb, var(--color-background) 80%, var(--color-foreground));
     --cart-line: 15px;
-    --cart-thumb: 100px;
-    --cart-item-gap: 20px;
+    --cart-thumb: 180px;
+    --cart-item-gap: 30px;
+    /* Open space between records: five lines of the 15px rhythm. */
+    --cart-item-space: 75px;
 
     /* As on the information pages: the first line sits 5px under the header. */
     padding: 5px var(--split-gutter) 0;
@@ -269,7 +272,7 @@
 
   .cart__items {
     margin: 0;
-    padding: 0;
+    padding: var(--cart-line) 0 0;
     list-style: none;
   }
 
@@ -282,8 +285,11 @@
       'image qty remove';
     column-gap: var(--cart-item-gap);
     row-gap: var(--cart-line);
-    padding: var(--cart-line) 0;
-    border-bottom: 1px solid var(--cart-hairline);
+  }
+
+  /* Records are told apart by their images and the space between them. */
+  .cart__item + .cart__item {
+    margin-top: var(--cart-item-space);
   }
 
   .cart__image {
@@ -325,6 +331,15 @@
     text-decoration: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 2px;
+  }
+
+  /* The image is the same link for the pointer; the title shows where it goes. */
+  @media (hover: hover) and (pointer: fine) {
+    .cart__item:has(.cart__image:hover) .cart__name {
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 2px;
+    }
   }
 
   .cart__meta {
@@ -443,10 +458,11 @@
 
   /* --- Summary and checkout ---------------------------------------------- */
 
+  /* Stacked below the items, it is set off by the same space as a record. */
   .cart__summary {
     display: grid;
     align-content: start;
-    padding-top: var(--cart-line);
+    margin-top: var(--cart-item-space);
   }
 
   .cart__update {
@@ -519,8 +535,14 @@
 
   /* --- Two columns: items · summary, on the PDP/footer split --------------- */
 
-  @media (min-width: 768px) {
+  /* Later than the PDP's 768px. Measured: from 1100 the details beside a 200px
+     image keep 145px even next to a "$12,345.67 USD" total (the 320px phone's
+     own details width), and a long title wraps no more than it does at 1280.
+     At 1080 that title takes a third line; at 960 the details fall to 76px. */
+  @media (min-width: 1100px) {
     .cart {
+      --cart-thumb: 200px;
+
       display: grid;
       grid-template-columns: var(--split-columns);
       grid-template-rows: auto 1fr;
@@ -544,12 +566,13 @@
     }
 
     /* Its rule continues the heading's across the split, and the subtotal
-       lines up with the first item. */
+       lines up with the top of the first image. */
     .cart__summary {
       grid-column: 2;
       grid-row: 2;
       /* Overlaps the heading's rule rather than drawing a second one under it. */
       margin-top: -1px;
+      padding-top: var(--cart-line);
       border-top: 1px solid var(--cart-hairline);
     }
   }
@@ -557,10 +580,28 @@
   @media (max-width: 700px) {
     /* The header's own 20px inset at this width, as on the information pages. */
     .cart {
-      --cart-thumb: 80px;
+      --cart-thumb: clamp(120px, 36vw, 160px);
       --cart-item-gap: 15px;
+      --cart-item-space: 60px;
 
       padding-top: 20px;
+    }
+
+    /* No third column: the line total joins the record under its details,
+       leaving quantity and remove the foot of the column. */
+    .cart__item {
+      grid-template-rows: auto auto 1fr;
+      grid-template-areas:
+        'image info info'
+        'image total total'
+        'image qty remove';
+      row-gap: 0;
+    }
+
+    .cart__total {
+      justify-items: start;
+      margin-bottom: var(--cart-line);
+      text-align: left;
     }
   }
 
