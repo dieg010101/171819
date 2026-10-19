@@ -182,7 +182,7 @@
       {%- endif -%}
     </div>
 
-    <div class="pdp__info">
+    <div class="pdp__info" data-pdp-info>
       <h1 class="pdp__title">{{ product.title }}</h1>
 
       <div class="pdp__buy-row">
@@ -850,8 +850,13 @@
       display: none;
     }
 
-    /* The title sits 122px below the media top at 1280px. */
+    /* The title sits 122px below the media top at 1280px. The details hold
+       still while the media column scrolls past. When they are taller than the
+       viewport, --pdp-info-height (set by the script) lets them stick by
+       their bottom instead, so nothing is out of reach. */
     .pdp__info {
+      position: sticky;
+      top: min(0px, calc(100vh - var(--pdp-info-height, 0px)));
       padding-top: clamp(24px, 9.53vw, 160px);
     }
   }
@@ -1085,6 +1090,17 @@
           syncQty();
         });
         syncQty();
+      }
+
+      /* ---------- Sticky details ---------- */
+
+      var info = root.querySelector('[data-pdp-info]');
+      if (info && 'ResizeObserver' in window) {
+        var infoObserver = new ResizeObserver(function () {
+          root.style.setProperty('--pdp-info-height', info.offsetHeight + 'px');
+        });
+        infoObserver.observe(info);
+        controller.signal.addEventListener('abort', function () { infoObserver.disconnect(); });
       }
 
       /* ---------- Disclosures ---------- */
