@@ -1,0 +1,98 @@
+{% comment %}
+  Homepage product grid: the collection page's grid alone, with no bar or
+  pagination (Figma option A). Shows a chosen collection, or every product.
+  The bird intro clears onto this page on the homepage.
+
+  The previous homepage, sections/home-product-coverflow.liquid, is kept: set
+  templates/index.json's main section type back to it to restore the cover flow.
+{% endcomment %}
+
+{%- liquid
+  assign source = section.settings.collection
+  if source == blank
+    assign source = collections.all
+  endif
+-%}
+
+<div class="home-grid full-width">
+  <ul class="home-grid__list">
+    {%- for product in source.products limit: section.settings.products_to_show -%}
+      {%- liquid
+        # The first row (three across on desktop) is above the fold.
+        assign loading = 'lazy'
+        if forloop.index <= 3
+          assign loading = 'eager'
+        endif
+        assign priority = 'auto'
+        if forloop.first
+          assign priority = 'high'
+        endif
+      -%}
+      <li class="home-grid__item">
+        {% render 'product-card', product: product, loading: loading, priority: priority %}
+      </li>
+    {%- endfor -%}
+  </ul>
+</div>
+
+{% stylesheet %}
+  /* The collection page's grid (collection.liquid, .shop and .shop__grid). */
+  .home-grid {
+    /* The 1280 Figma: 3 × 365 columns and 2 × 30 gaps leave 62.5px a side. */
+    --home-grid-gutter: 62.5px;
+    --home-grid-cols: 3;
+
+    padding: 7px var(--home-grid-gutter) 2px;
+  }
+
+  .home-grid__list {
+    display: grid;
+    grid-template-columns: repeat(var(--home-grid-cols), minmax(0, 1fr));
+    column-gap: 30px;
+    row-gap: 37px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (max-width: 700px) {
+    /* Matches the header's own 20px inset at this width. */
+    .home-grid {
+      --home-grid-gutter: 20px;
+      --home-grid-cols: 2;
+    }
+
+    .home-grid__list {
+      column-gap: 8px;
+      row-gap: 32px;
+    }
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Product grid",
+  "settings": [
+    {
+      "type": "collection",
+      "id": "collection",
+      "label": "Collection",
+      "info": "Leave empty to show every product."
+    },
+    {
+      "type": "range",
+      "id": "products_to_show",
+      "label": "Products",
+      "min": 3,
+      "max": 48,
+      "step": 3,
+      "default": 24
+    }
+  ],
+  "presets": [
+    {
+      "name": "Product grid"
+    }
+  ]
+}
+{% endschema %}

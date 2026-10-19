@@ -10,7 +10,7 @@
 {
   "sections": {
     "main": {
-      "type": "home-product-coverflow",
+      "type": "home-grid",
       "settings": {}
     }
   },
