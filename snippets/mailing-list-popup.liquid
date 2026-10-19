@@ -142,7 +142,8 @@
       transition: none;
     }
 
-    .mailing-list__input {
+    .mailing-list__input,
+    .mailing-list__close {
       transition-duration: 1ms;
     }
   }
@@ -156,10 +157,17 @@
     border: 0;
     border-radius: 0;
     background: none;
-    color: inherit;
+    /* Muted → ink on hover, as the site's other text actions (Remove, Shop).
+       55% black keeps 4:1 on the #d9d9d9 panel. */
+    color: color-mix(in srgb, var(--mailing-list-ink) 55%, transparent);
     font: inherit;
     letter-spacing: inherit;
     cursor: pointer;
+    transition: color 150ms ease;
+  }
+
+  .mailing-list__close:hover {
+    color: var(--mailing-list-ink);
   }
 
   .mailing-list__close::before {

@@ -207,6 +207,8 @@
     --cart-quiet: color-mix(in srgb, var(--color-foreground) 64%, var(--color-background));
     /* The PDP's and footer's hairline. */
     --cart-hairline: color-mix(in srgb, var(--cart-ink) 24%, transparent);
+    /* Checkout's hover fill (experiment), the same grey as Add to Cart's. */
+    --cart-fill: color-mix(in srgb, var(--cart-ink) 12%, transparent);
     --cart-plate: color-mix(in srgb, var(--color-background) 80%, var(--color-foreground));
     --cart-line: 15px;
     --cart-thumb: 180px;
@@ -508,13 +510,19 @@
     padding: 0 1rem;
     border: 1px solid var(--cart-hairline);
     border-radius: 9.5px;
-    background: none;
+    /* Experiment, as the PDP's Add to Cart: on hover a soft grey fills the
+       capsule from the left. To revert to the white outline, swap this
+       background and transition for the commented lines and restore the
+       hover rule below.
+       background: none;
+       transition: border-color 150ms ease; */
+    background: linear-gradient(var(--cart-fill), var(--cart-fill)) no-repeat left / 0% 100%;
     color: inherit;
     font: inherit;
     line-height: 12px;
     letter-spacing: inherit;
     cursor: pointer;
-    transition: border-color 150ms ease;
+    transition: background-size 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
   }
 
   .cart__checkout::before {
@@ -523,8 +531,12 @@
     inset: -12px -1px;
   }
 
+  /* Revert (white outline):
   .cart__checkout:hover {
     border-color: var(--cart-ink);
+  } */
+  .cart__checkout:hover {
+    background-size: 100% 100%;
   }
 
   /* --- Empty ------------------------------------------------------------- */
