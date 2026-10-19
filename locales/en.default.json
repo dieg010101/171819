@@ -52,7 +52,6 @@
       "other": "{{ count }} results for “{{ terms }}”"
     },
     "shop": "Shop",
-    "sold_out": "Sold out",
     "types": {
       "page": "Page",
       "article": "Article"

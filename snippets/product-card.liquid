@@ -1,0 +1,239 @@
+{% doc %}
+  Product card: image in the Figma's 365 × 501 frame, then title and price on
+  19px lines. On a fine pointer the product's second image fades in on first
+  hover or focus; it waits in an inert template until then, so it costs
+  nothing otherwise. Shared by the collection, search and homepage grids; each
+  caller owns its list item and grid.
+
+  @param {product} product - The product to show
+  @param {string} [loading] - 'eager' for cards above the fold (default 'lazy')
+  @param {string} [priority] - 'high' for the page's LCP card (default 'auto')
+  @param {string} [sizes] - Image sizes for the caller's grid (default: the collection's)
+
+  @example
+  {% render 'product-card', product: product, loading: 'eager', priority: 'high' %}
+{% enddoc %}
+
+{%- liquid
+  assign loading = loading | default: 'lazy'
+  assign priority = priority | default: 'auto'
+  assign sizes = sizes | default: '(min-width: 701px) calc((100vw - 185px) / 3), calc((100vw - 48px) / 2)'
+
+  assign primary = product.featured_media.preview_image
+  assign secondary = nil
+  for media in product.media offset: 1
+    if media.preview_image
+      assign secondary = media.preview_image
+      break
+    endif
+  endfor
+-%}
+
+<a class="product-card" href="{{ product.url }}" data-product-card>
+  <div class="product-card__media">
+    {%- if primary -%}
+      {{
+        primary
+        | image_url: width: 1200
+        | image_tag:
+          class: 'product-card__img',
+          widths: '240, 360, 480, 640, 800, 960, 1200',
+          sizes: sizes,
+          loading: loading,
+          fetchpriority: priority,
+          alt: primary.alt | default: product.title
+      }}
+    {%- else -%}
+      {{ 'product-apparel-1' | placeholder_svg_tag: 'product-card__img product-card__placeholder' }}
+    {%- endif -%}
+
+    {%- if secondary -%}
+      <template data-product-card-alt>
+        {{
+          secondary
+          | image_url: width: 1200
+          | image_tag:
+            class: 'product-card__img product-card__img--alt',
+            widths: '240, 360, 480, 640, 800, 960, 1200',
+            sizes: sizes,
+            alt: ''
+        }}
+      </template>
+    {%- endif -%}
+  </div>
+
+  <div class="product-card__meta">
+    <p class="product-card__title">{{ product.title | escape }}</p>
+    <p class="product-card__price">
+      {%- if product.compare_at_price > product.price -%}
+        <span class="product-card__sr">Sale price</span>
+      {%- endif -%}
+      {%- comment -%} Same money formats as the PDP: currency on the price, not repeated on the strikethrough. {%- endcomment -%}
+      {%- if product.price_varies -%}
+        {{ product.price_min | money }}–{{ product.price_max | money_with_currency }}
+      {%- else -%}
+        {{ product.price | money_with_currency }}
+      {%- endif -%}
+      {%- if product.compare_at_price > product.price -%}
+        <s class="product-card__was">
+          <span class="product-card__sr">Regular price</span>
+          {{ product.compare_at_price | money }}
+        </s>
+      {%- endif -%}
+      {%- unless product.available -%}
+        <span class="product-card__soldout">Sold out</span>
+      {%- endunless -%}
+    </p>
+  </div>
+</a>
+
+{% stylesheet %}
+  .product-card {
+    /* 64%: the least that keeps quiet text at 4.5:1 with the default colours. */
+    --product-card-quiet: color-mix(in srgb, var(--color-foreground) 64%, var(--color-background));
+
+    display: block;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .product-card__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* The Figma's 365 × 501 frame; photographs fill it edge to edge. */
+  .product-card__media {
+    position: relative;
+    aspect-ratio: 365 / 501;
+  }
+
+  .product-card__img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .product-card__placeholder {
+    fill: var(--product-card-quiet);
+  }
+
+  .product-card__img--alt {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 200ms ease;
+  }
+
+  /* Only real hover devices swap images; touch never does. */
+  @media (hover: hover) and (pointer: fine) {
+    .product-card:is(:hover, :focus-visible) .product-card__img--alt.is-loaded {
+      opacity: 1;
+    }
+  }
+
+  /* Title and price sit 19px apart, centred where the Figma's 30px line
+     boxes put them, without carrying those boxes' empty height. */
+  .product-card__meta {
+    display: grid;
+    min-width: 0;
+    padding-top: 14px;
+    color: #fff;
+    font-family: var(--font-secondary--family);
+    font-weight: 400;
+  }
+
+  .product-card__title,
+  .product-card__price {
+    margin: 0;
+    font-size: 11px;
+    line-height: 19px;
+  }
+
+  .product-card__title {
+    letter-spacing: -0.05em;
+  }
+
+  .product-card:hover .product-card__title {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  .product-card__price {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 0.6em;
+    letter-spacing: normal;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .product-card__was {
+    color: var(--product-card-quiet);
+  }
+
+  /* Words, not colour, carry the state. */
+  .product-card__soldout {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-foreground);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .product-card__img--alt {
+      transition-duration: 1ms;
+    }
+  }
+{% endstylesheet %}
+
+{% javascript %}
+  (function () {
+    'use strict';
+
+    // Second image: inserted from its inert template on first hover/focus,
+    // only where a fine pointer can hover.
+    var canHover = window.matchMedia('(hover: hover) and (pointer: fine)');
+
+    function init(scope) {
+      scope.querySelectorAll('[data-product-card]').forEach(function (link) {
+        if (link.dataset.productCardReady === 'true') return;
+        link.dataset.productCardReady = 'true';
+
+        var template = link.querySelector('template[data-product-card-alt]');
+        if (!template) return;
+
+        function load() {
+          if (!canHover.matches || !template.parentNode) return;
+          var img = template.content.firstElementChild.cloneNode(true);
+          img.setAttribute('aria-hidden', 'true');
+          img.addEventListener('load', function () { img.classList.add('is-loaded'); });
+          template.replaceWith(img);
+          if (img.complete && img.naturalWidth) img.classList.add('is-loaded');
+        }
+
+        link.addEventListener('pointerenter', load);
+        link.addEventListener('focus', load);
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () { init(document); });
+    } else {
+      init(document);
+    }
+
+    document.addEventListener('shopify:section:load', function (event) {
+      init(event.target);
+    });
+  })();
+{% endjavascript %}
