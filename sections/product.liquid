@@ -289,6 +289,7 @@
           name="add"
           data-pdp-submit
           data-label-add="Add to Cart"
+          data-label-adding="Adding…"
           data-label-soldout="Sold out"
           data-label-unavailable="Unavailable"
           {% unless current_variant.available %}
@@ -852,21 +853,21 @@
 
     /* The title sits 122px below the media top at 1280px. */
     .pdp__info {
-      --pdp-info-lead: clamp(24px, 9.53vw, 160px);
-      padding-top: var(--pdp-info-lead);
+      padding-top: clamp(24px, 9.53vw, 160px);
     }
   }
 
-  /* Where there is room, the details hold still with the title 64px from the
-     top while the media scrolls past, releasing where the media ends. When
-     they are taller than the viewport, --pdp-info-height (set by the script)
-     lets them stick by their bottom instead, so nothing is out of reach.
-     Position, not motion, so it stays under reduced motion. */
+  /* Where there is room, the details never move: they stick at the height
+     they load at (--pdp-info-start, measured by the script) while the media
+     scrolls past, releasing where the media ends. When they are taller than
+     the space below that, --pdp-info-height lets them stick by their bottom
+     instead, so nothing is out of reach. Position, not motion, so it stays
+     under reduced motion. */
   @media (min-width: 1100px) {
     .pdp__info {
       position: sticky;
       top: min(
-        calc(64px - var(--pdp-info-lead)),
+        var(--pdp-info-start, 0px),
         calc(100vh - var(--pdp-info-height, 0px))
       );
     }
@@ -1106,12 +1107,50 @@
       /* ---------- Sticky details ---------- */
 
       var info = root.querySelector('[data-pdp-info]');
-      if (info && 'ResizeObserver' in window) {
+      var grid = root.querySelector('.pdp__grid');
+      if (info && grid && 'ResizeObserver' in window) {
+        // The grid, not the sticky column, so the measure is never thrown off
+        // by how far the column is currently stuck.
         var infoObserver = new ResizeObserver(function () {
+          root.style.setProperty('--pdp-info-start', grid.getBoundingClientRect().top + window.scrollY + 'px');
           root.style.setProperty('--pdp-info-height', info.offsetHeight + 'px');
         });
         infoObserver.observe(info);
+        infoObserver.observe(document.body);
         controller.signal.addEventListener('abort', function () { infoObserver.disconnect(); });
+      }
+
+      /* ---------- Add to Cart ---------- */
+
+      // Adds in place: "Adding…", then CART (n) in the header. Any failure
+      // falls back to the plain form post, so Shopify's own handling (and its
+      // error page for, say, more than are in stock) is unchanged.
+      var form = submit && submit.form;
+      var cartCount = document.querySelector('[data-cart-count]');
+      if (form && window.fetch && window.FormData) {
+        form.addEventListener('submit', function (event) {
+          if (submit.disabled) return;
+          event.preventDefault();
+          var body = new FormData(form);
+          submit.disabled = true;
+          submit.textContent = submit.dataset.labelAdding;
+
+          fetch(form.action + '.js', { method: 'POST', headers: { Accept: 'application/json' }, body: body })
+            .then(function (response) {
+              if (!response.ok) throw new Error('Add to cart failed');
+              return fetch(form.action.replace(/\/add$/, '.js'), { headers: { Accept: 'application/json' } });
+            })
+            .then(function (response) { return response.json(); })
+            .then(function (cart) {
+              if (cartCount) cartCount.textContent = cart.item_count;
+              submit.disabled = false;
+              submit.textContent = submit.dataset.labelAdd;
+              live.textContent = 'Added to cart. Cart (' + cart.item_count + ')';
+            })
+            .catch(function () {
+              HTMLFormElement.prototype.submit.call(form);
+            });
+        }, { signal: controller.signal });
       }
 
       /* ---------- Disclosures ---------- */

@@ -32,7 +32,7 @@
 
   {%- if cart.item_count > 0 -%}
     <form class="cart__form" action="{{ routes.cart_url }}" method="post" data-cart-form>
-      <ul class="cart__items">
+      <ul class="cart__items" data-cart-items>
         {%- for item in cart.items -%}
           <li class="cart__item" data-cart-line="{{ item.key }}">
             <a class="cart__image" href="{{ item.url }}" tabindex="-1" aria-hidden="true">
@@ -152,7 +152,7 @@
       {%- comment -%} Announces Shopify's response to a quantity change; the visible copy sits on the line itself. {%- endcomment -%}
       <p class="cart__sr" aria-live="polite" data-cart-live></p>
 
-      <div class="cart__summary">
+      <div class="cart__summary" data-cart-summary>
         {%- comment -%}
           First submit in the form, so pressing Enter in a quantity field updates
           rather than checks out. Hidden once JS applies quantities on change.
@@ -285,6 +285,12 @@
       'image qty remove';
     column-gap: var(--cart-item-gap);
     row-gap: var(--cart-line);
+    transition: opacity 200ms ease;
+  }
+
+  /* A quiet "working" while Shopify answers a quantity change. */
+  .cart__item[aria-busy='true'] {
+    opacity: 0.5;
   }
 
   /* Records are told apart by their images and the space between them. */
@@ -574,6 +580,15 @@
       margin-top: -1px;
       padding-top: var(--cart-line);
       border-top: 1px solid var(--cart-hairline);
+      /* As the PDP's details: beside a long cart it never moves, sticking at
+         the height it loads at (--cart-summary-start, measured by the
+         script). If it is taller than the space below that, it sticks by its
+         bottom so Checkout stays reachable. Position, not motion. */
+      position: sticky;
+      top: min(
+        var(--cart-summary-start, 0px),
+        calc(100vh - var(--cart-summary-height, 0px))
+      );
     }
   }
 
@@ -660,6 +675,16 @@
       root.classList.add('is-enhanced');
 
       var live = root.querySelector('[data-cart-live]');
+      var items = root.querySelector('[data-cart-items]');
+      var summary = root.querySelector('[data-cart-summary]');
+      if (items && summary && 'ResizeObserver' in window) {
+        // The items share the summary's row, so their top is where the summary
+        // loads, unaffected by how far it is currently stuck.
+        new ResizeObserver(function () {
+          root.style.setProperty('--cart-summary-start', items.getBoundingClientRect().top + window.scrollY + 'px');
+          root.style.setProperty('--cart-summary-height', summary.offsetHeight + 'px');
+        }).observe(root);
+      }
       var changeUrl = root.dataset.changeUrl + '.js';
       var cartUrl = root.dataset.cartUrl + '.js';
       var busy = false;
