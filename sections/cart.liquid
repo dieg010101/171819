@@ -53,7 +53,7 @@
                     alt: ''
                 }}
               {%- else -%}
-                {{ 'product-apparel-1' | placeholder_svg_tag: 'cart__placeholder' }}
+                {% render 'media-placeholder', class: 'cart__placeholder' %}
               {%- endif -%}
             </a>
 
@@ -133,10 +133,21 @@
 
             <p class="cart__total">
               <span class="cart__sr">Total</span>
-              {%- if item.original_line_price != item.final_line_price -%}
+              {%- liquid
+                # Struck through: the sale's compare-at price, or the price
+                # before a discount, whichever is higher.
+                assign was_line_price = item.original_line_price
+                if item.variant.compare_at_price > item.variant.price
+                  assign compare_line_price = item.variant.compare_at_price | times: item.quantity
+                  if compare_line_price > was_line_price
+                    assign was_line_price = compare_line_price
+                  endif
+                endif
+              -%}
+              {%- if was_line_price > item.final_line_price -%}
                 <s class="cart__was">
                   <span class="cart__sr">Regular price</span>
-                  {{ item.original_line_price | money_without_trailing_zeros }}
+                  {{ was_line_price | money_without_trailing_zeros }}
                 </s>
               {%- endif -%}
               <span>{{ item.final_line_price | money_without_trailing_zeros }}</span>
@@ -312,8 +323,7 @@
 
   /* Natural proportions: garments are never cropped. The image's own width and
      height attributes reserve its box before it loads. */
-  .cart__image img,
-  .cart__placeholder {
+  .cart__image img {
     display: block;
     width: 100%;
     height: auto;
@@ -321,7 +331,6 @@
 
   .cart__placeholder {
     aspect-ratio: 2 / 3;
-    fill: var(--cart-quiet);
   }
 
   .cart__info {

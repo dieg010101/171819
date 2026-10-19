@@ -43,6 +43,8 @@
           fetchpriority: priority,
           alt: primary.alt | default: product.title
       }}
+    {%- else -%}
+      {% render 'media-placeholder' %}
     {%- endif -%}
 
     {%- if secondary -%}

@@ -164,7 +164,7 @@
           </li>
         {%- else -%}
           <li class="pdp__slide is-active" data-pdp-slide>
-            {{ 'product-apparel-1' | placeholder_svg_tag: 'pdp__media-el pdp__placeholder' }}
+            {% render 'media-placeholder' %}
           </li>
         {%- endfor -%}
       </ul>
@@ -486,10 +486,6 @@
     /* The design fills the frame edge to edge, so off-ratio media is cropped. */
     object-fit: cover;
     border: 0;
-  }
-
-  .pdp__placeholder {
-    fill: var(--pdp-quiet);
   }
 
   .pdp__index {

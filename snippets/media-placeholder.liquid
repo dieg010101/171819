@@ -1,0 +1,27 @@
+{% doc %}
+  Stands in for a product photograph that does not exist: a quiet plate with a
+  soft, out-of-focus glow, so a missing image reads as a blurred photo rather
+  than an illustration. It fills its container; the caller sets the size.
+
+  @param {string} [class] - Extra classes, e.g. for the caller's aspect ratio
+
+  @example
+  {% render 'media-placeholder', class: 'cart__placeholder' %}
+{% enddoc %}
+
+<span class="media-placeholder{% if class != blank %} {{ class }}{% endif %}" aria-hidden="true"></span>
+
+{% stylesheet %}
+  .media-placeholder {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background:
+      radial-gradient(
+        55% 40% at 50% 42%,
+        color-mix(in srgb, var(--color-foreground) 12%, transparent),
+        transparent 70%
+      ),
+      color-mix(in srgb, var(--color-background) 80%, var(--color-foreground));
+  }
+{% endstylesheet %}
