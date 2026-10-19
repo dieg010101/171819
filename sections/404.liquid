@@ -8,7 +8,7 @@
   https://shopify.dev/docs/storefronts/themes/architecture/templates/404
 {% endcomment %}
 
-<div class="not-found">
+<div class="not-found full-width">
   <div class="not-found__content">
     <h1 class="not-found__title">
       <span class="not-found__code">{{ '404.title' | t }}</span>
@@ -22,6 +22,12 @@
 </div>
 
 {% stylesheet %}
+  /* The footer follows <main>; letting <main> take the body's spare height
+     keeps it at the bottom of this short page. */
+  body:has(.not-found) > main {
+    flex: 1 0 auto;
+  }
+
   .not-found {
     --not-found-ink: #fff;
     /* 46%: the least that keeps quiet text at 4.5:1 on #1b1b1b (as the PDP). */
