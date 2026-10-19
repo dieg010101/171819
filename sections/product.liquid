@@ -413,10 +413,10 @@
     /* Colour and lines change at 150ms; opacity fades at 200ms. */
     --pdp-ease-line: 150ms ease;
     --pdp-ease: 200ms ease;
-    /* Add to Cart's hover fill (experiment): a quiet grey that leaves the
-       white label at full contrast, arriving on the site's ease-out. */
-    --pdp-fill: color-mix(in srgb, var(--pdp-ink) 12%, transparent);
-    --pdp-ease-fill: 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    /* Add to Cart's hover (experiment): one shade of fill and one of line,
+       barely a lift, and a quicker press. */
+    --pdp-fill: color-mix(in srgb, var(--pdp-ink) 7%, transparent);
+    --pdp-fill-press: color-mix(in srgb, var(--pdp-ink) 4%, transparent);
 
     /* With the header's 158px, puts the media top at the Figma's y = 168. The
        space below belongs to the site footer (--site-footer-gap). The gutter
@@ -689,18 +689,21 @@
     padding: 0 1rem;
     border: 1px solid var(--pdp-hairline);
     border-radius: 9.5px;
-    /* Experiment: on hover a soft grey fills the capsule from the left. To
-       revert to the white outline, swap this background and transition for
-       the commented lines and restore the hover rule below.
-       background: none;
-       transition: border-color var(--pdp-ease-line), color var(--pdp-ease-line); */
-    background: linear-gradient(var(--pdp-fill), var(--pdp-fill)) no-repeat left / 0% 100%;
+    background: none;
     color: inherit;
     font: inherit;
     line-height: 12px;
     letter-spacing: -0.05em;
     cursor: pointer;
-    transition: background-size var(--pdp-ease-fill), color var(--pdp-ease-line);
+    /* Experiment: a soft grey fill on hover. To revert to the white outline,
+       swap this transition for the commented one and restore the hover rule
+       below.
+       transition: border-color var(--pdp-ease-line), color var(--pdp-ease-line); */
+    transition:
+      background-color var(--pdp-ease),
+      border-color var(--pdp-ease),
+      box-shadow var(--pdp-ease),
+      color var(--pdp-ease-line);
   }
 
   .pdp__submit::before {
@@ -714,7 +717,15 @@
     border-color: var(--pdp-ink);
   } */
   .pdp__submit:hover:not(:disabled) {
-    background-size: 100% 100%;
+    border-color: var(--pdp-selected-line);
+    background-color: var(--pdp-fill);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
+  }
+
+  .pdp__submit:active:not(:disabled) {
+    background-color: var(--pdp-fill-press);
+    box-shadow: none;
+    transition-duration: 80ms;
   }
 
   .pdp__submit:disabled {

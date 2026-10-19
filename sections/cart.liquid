@@ -207,8 +207,11 @@
     --cart-quiet: color-mix(in srgb, var(--color-foreground) 64%, var(--color-background));
     /* The PDP's and footer's hairline. */
     --cart-hairline: color-mix(in srgb, var(--cart-ink) 24%, transparent);
-    /* Checkout's hover fill (experiment), the same grey as Add to Cart's. */
-    --cart-fill: color-mix(in srgb, var(--cart-ink) 12%, transparent);
+    /* Checkout's hover (experiment), as Add to Cart's: one shade of fill and
+       one of line, and a quicker press. */
+    --cart-fill: color-mix(in srgb, var(--cart-ink) 7%, transparent);
+    --cart-fill-press: color-mix(in srgb, var(--cart-ink) 4%, transparent);
+    --cart-line-hover: color-mix(in srgb, var(--cart-ink) 35%, transparent);
     --cart-plate: color-mix(in srgb, var(--color-background) 80%, var(--color-foreground));
     --cart-line: 15px;
     --cart-thumb: 180px;
@@ -510,19 +513,20 @@
     padding: 0 1rem;
     border: 1px solid var(--cart-hairline);
     border-radius: 9.5px;
-    /* Experiment, as the PDP's Add to Cart: on hover a soft grey fills the
-       capsule from the left. To revert to the white outline, swap this
-       background and transition for the commented lines and restore the
-       hover rule below.
-       background: none;
-       transition: border-color 150ms ease; */
-    background: linear-gradient(var(--cart-fill), var(--cart-fill)) no-repeat left / 0% 100%;
+    background: none;
     color: inherit;
     font: inherit;
     line-height: 12px;
     letter-spacing: inherit;
     cursor: pointer;
-    transition: background-size 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    /* Experiment, as the PDP's Add to Cart: a soft grey fill on hover. To
+       revert to the white outline, swap this transition for the commented
+       one and restore the hover rule below.
+       transition: border-color 150ms ease; */
+    transition:
+      background-color 200ms ease,
+      border-color 200ms ease,
+      box-shadow 200ms ease;
   }
 
   .cart__checkout::before {
@@ -536,7 +540,15 @@
     border-color: var(--cart-ink);
   } */
   .cart__checkout:hover {
-    background-size: 100% 100%;
+    border-color: var(--cart-line-hover);
+    background-color: var(--cart-fill);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
+  }
+
+  .cart__checkout:active {
+    background-color: var(--cart-fill-press);
+    box-shadow: none;
+    transition-duration: 80ms;
   }
 
   /* --- Empty ------------------------------------------------------------- */
