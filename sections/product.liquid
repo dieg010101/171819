@@ -155,7 +155,7 @@
                   | image_tag:
                     class: 'pdp__media-el',
                     widths: '400, 560, 720, 900, 1100, 1300, 1600',
-                    sizes: '(min-width: 768px) 46vw, calc(100vw - 40px)',
+                    sizes: '(min-width: 768px) 48vw, calc(100vw - 40px)',
                     loading: loading,
                     fetchpriority: priority,
                     alt: alt
@@ -395,9 +395,11 @@
 
 {% stylesheet %}
   /*
-    Geometry is derived from the 1280px Figma frame (64px gutters, a 554px media
-    column, 125px of air, a 472px information column) and expressed as
-    proportions so the same composition holds at other widths.
+    Geometry is derived from the 1280px Figma frame (option B2: 64px gutters, a
+    610px media column, 69px of air, a 472px information column) and expressed
+    as proportions so the same composition holds at other widths. The
+    information column keeps the site's split (as the footer beneath it); the
+    media simply reaches into part of the gap.
   */
   .pdp {
     --pdp-ink: #fff;
@@ -407,8 +409,8 @@
     --pdp-hairline: color-mix(in srgb, var(--pdp-ink) 24%, transparent);
     /* The selected value's underline is its only state cue, so it needs 3:1. */
     --pdp-selected-line: color-mix(in srgb, var(--pdp-ink) 35%, transparent);
-    /* 554 × 615: the media frame in the Figma. */
-    --pdp-frame: 554 / 615;
+    /* 2:3, the product photographs' own shape, so they show whole. */
+    --pdp-frame: 2 / 3;
     --pdp-line: 30px;
     /* Colour and lines change at 150ms; opacity fades at 200ms. */
     --pdp-ease-line: 150ms ease;
@@ -857,6 +859,9 @@
       position: relative;
       z-index: 1;
       margin-bottom: calc(-1 * (var(--site-footer-gap) + var(--site-footer-block)));
+      /* Into 44.8% of the gap: 554 → 610 and 125 → 69 at 1280px, while the
+         information column (and the footer under it) stays on the split. */
+      margin-right: calc(-0.448 * var(--split-gap));
     }
 
     /* Desktop: every media in one column, each in the same frame; the next one
