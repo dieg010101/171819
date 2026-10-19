@@ -409,6 +409,8 @@
     /* 554 × 615: the media frame in the Figma. */
     --pdp-frame: 554 / 615;
     --pdp-line: 30px;
+    /* Colour and lines change at 150ms; opacity fades at 200ms. */
+    --pdp-ease-line: 150ms ease;
     --pdp-ease: 200ms ease;
 
     /* With the header's 158px, puts the media top at the Figma's y = 168. The
@@ -612,7 +614,7 @@
     margin: -7px -10px;
     font-variant-numeric: tabular-nums;
     cursor: pointer;
-    transition: color var(--pdp-ease);
+    transition: color var(--pdp-ease-line);
   }
 
   .pdp__value-text {
@@ -688,7 +690,7 @@
     line-height: 12px;
     letter-spacing: -0.05em;
     cursor: pointer;
-    transition: border-color var(--pdp-ease), color var(--pdp-ease);
+    transition: border-color var(--pdp-ease-line), color var(--pdp-ease-line);
   }
 
   .pdp__submit::before {

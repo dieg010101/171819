@@ -315,7 +315,7 @@
 
   .shop :is(a, button, select, input):focus-visible {
     outline: 1px solid var(--color-foreground);
-    outline-offset: 3px;
+    outline-offset: 2px;
   }
 
   /* --- Utility bar: categories left, count · filter · sort right ------------ */
@@ -387,6 +387,7 @@
   .shop__cat {
     color: var(--shop-quiet);
     text-decoration: none;
+    transition: color 150ms ease;
   }
 
   .shop__cat:hover,
@@ -437,6 +438,7 @@
     background: none;
     font-family: inherit;
     cursor: pointer;
+    transition: color 150ms ease;
   }
 
   .shop__tool:hover,
@@ -676,6 +678,7 @@
     color: var(--shop-quiet);
     text-decoration: none;
     font-variant-numeric: tabular-nums;
+    transition: color 150ms ease;
   }
 
   .shop__page:hover,
@@ -738,6 +741,12 @@
 
     .shop__value {
       min-height: 44px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shop :is(.shop__cat, .shop__tool, .shop__page) {
+      transition-duration: 1ms;
     }
   }
 {% endstylesheet %}
