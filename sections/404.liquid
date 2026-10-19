@@ -2,18 +2,98 @@
   This section is used in the 404 template to render page shown when customers
   enter an invalid store URL.
 
+  Set quietly where a product's title would be: on the information column of
+  the PDP's split, at the same height. One column on phones.
+
   https://shopify.dev/docs/storefronts/themes/architecture/templates/404
 {% endcomment %}
 
-<h1>{{ '404.title' | t }}</h1>
+<div class="not-found">
+  <div class="not-found__content">
+    <h1 class="not-found__title">
+      <span class="not-found__code">{{ '404.title' | t }}</span>
+      <span class="not-found__message">{{ '404.not_found' | t }}</span>
+    </h1>
 
-<p>
-  {{ '404.not_found' | t }}
-</p>
+    <a class="not-found__link" href="{{ routes.all_products_collection_url }}">
+      {{- '404.back_to_shopping' | t -}}
+    </a>
+  </div>
+</div>
 
-<a href="{{ routes.all_products_collection_url }}">
-  {{ '404.back_to_shopping' | t }}
-</a>
+{% stylesheet %}
+  .not-found {
+    --not-found-ink: #fff;
+    /* 46%: the least that keeps quiet text at 4.5:1 on #1b1b1b (as the PDP). */
+    --not-found-quiet: color-mix(in srgb, var(--not-found-ink) 46%, transparent);
+
+    padding: 20px var(--split-gutter) 0;
+    color: var(--not-found-ink);
+    font-family: var(--font-secondary--family);
+    font-size: 11px;
+    line-height: 15px;
+    letter-spacing: -0.05em;
+  }
+
+  .not-found__title {
+    margin: 0;
+    font: inherit;
+    letter-spacing: inherit;
+  }
+
+  .not-found__code,
+  .not-found__message {
+    display: block;
+  }
+
+  .not-found__code {
+    color: var(--not-found-quiet);
+  }
+
+  .not-found__link {
+    display: inline-block;
+    margin-top: 15px;
+    color: var(--not-found-quiet);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+    transition: color 150ms ease;
+  }
+
+  .not-found__link:hover {
+    color: var(--not-found-ink);
+  }
+
+  .not-found__link:focus-visible {
+    outline: 1px solid currentcolor;
+    outline-offset: 2px;
+  }
+
+  /* The PDP's split and its title height (product.liquid, .pdp__grid and
+     .pdp__info), so the message sits where a product name would. */
+  @media (min-width: 768px) {
+    .not-found {
+      display: grid;
+      grid-template-columns: var(--split-columns);
+      column-gap: var(--split-gap);
+      width: 100%;
+      max-width: calc(var(--split-max) + 2 * var(--split-gutter));
+      margin-inline: auto;
+      padding-top: 10px;
+    }
+
+    .not-found__content {
+      grid-column: 2;
+      padding-top: clamp(24px, 9.53vw, 160px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .not-found__link {
+      transition-duration: 1ms;
+    }
+  }
+{% endstylesheet %}
 
 {% schema %}
 {
