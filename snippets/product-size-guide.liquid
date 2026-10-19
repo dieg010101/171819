@@ -204,6 +204,21 @@
     width: auto;
   }
 
+  /* Both units share one spot and only one shows, so every column is always
+     as wide as its widest value in either unit: switching never moves the
+     table. */
+  .size-guide__value {
+    display: inline-grid;
+  }
+
+  .size-guide__value > * {
+    grid-area: 1 / 1;
+  }
+
+  .size-guide__value > :not(.is-shown) {
+    visibility: hidden;
+  }
+
   /* As wide as the table, never wider: it wraps rather than pushing the
      table off the right edge. */
   .size-guide__note {
@@ -227,21 +242,46 @@
       return from === 'cm' ? value / CM_PER_IN : value * CM_PER_IN;
     }
 
-    // At most one decimal, without a trailing .0.
+    // Always one decimal, so a converted column never mixes 28 with 27.9.
     function format(value) {
-      return String(Math.round(value * 10) / 10);
+      return value.toFixed(1);
     }
 
     /* ---------- DOM ---------- */
 
-    // Always converts from the authored value, so switching back and forth
-    // never accumulates rounding; the authored unit shows the value exactly as
-    // rendered by Liquid, whatever its precision.
-    function setUnit(guide, unit) {
+    // Each cell gets both units up front, stacked in one spot (see
+    // .size-guide__value), so columns are sized for both before the first
+    // switch. Always converted from the authored value, so switching back and
+    // forth never accumulates rounding; the authored unit shows the value
+    // exactly as rendered by Liquid, whatever its precision.
+    function prepare(guide) {
+      if (guide.dataset.sizeGuideReady === 'true') return;
+      guide.dataset.sizeGuideReady = 'true';
       var authored = guide.dataset.sizeGuideUnit;
       guide.querySelectorAll('[data-size-guide-value]').forEach(function (cell) {
         var value = cell.dataset.sizeGuideValue;
-        cell.textContent = unit === authored ? value : format(convert(Number(value), authored, unit));
+        var wrap = document.createElement('span');
+        wrap.className = 'size-guide__value';
+        Object.keys(UNIT_NAMES).forEach(function (unit) {
+          var span = document.createElement('span');
+          span.dataset.sizeGuideIn = unit;
+          span.textContent = unit === authored ? value : format(convert(Number(value), authored, unit));
+          if (unit === authored) span.className = 'is-shown';
+          wrap.appendChild(span);
+        });
+        cell.textContent = '';
+        cell.appendChild(wrap);
+      });
+    }
+
+    function prepareAll(scope) {
+      (scope || document).querySelectorAll('[data-size-guide]').forEach(prepare);
+    }
+
+    function setUnit(guide, unit) {
+      prepare(guide);
+      guide.querySelectorAll('[data-size-guide-in]').forEach(function (span) {
+        span.classList.toggle('is-shown', span.dataset.sizeGuideIn === unit);
       });
       guide.querySelectorAll('[data-size-guide-unit-option]').forEach(function (button) {
         button.setAttribute('aria-pressed', String(button.dataset.sizeGuideUnitOption === unit));
@@ -255,6 +295,16 @@
       if (!button) return;
       var guide = button.closest('[data-size-guide]');
       if (guide) setUnit(guide, button.dataset.sizeGuideUnitOption);
+    });
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () { prepareAll(); });
+    } else {
+      prepareAll();
+    }
+
+    document.addEventListener('shopify:section:load', function (event) {
+      prepareAll(event.target);
     });
   })();
 {% endjavascript %}
