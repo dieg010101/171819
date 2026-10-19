@@ -66,6 +66,8 @@
   /* Each Heading 2 is a section, numbered 01, 02, … in the quiet tone. */
   .information-page__richtext > h2 {
     counter-increment: information-section;
+    /* In-page links never land a heading against the viewport edge. */
+    scroll-margin-top: 64px;
     /* A long name wraps under itself, not under its number. */
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
@@ -140,8 +142,12 @@
       margin-inline: auto;
     }
 
+    /* The page name stays in view beside a long column. Position, not motion,
+       so it stays under reduced motion. */
     .information-page__title {
       margin-bottom: 0;
+      position: sticky;
+      top: 64px;
     }
 
     .information-page__richtext {

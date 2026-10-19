@@ -850,14 +850,25 @@
       display: none;
     }
 
-    /* The title sits 122px below the media top at 1280px. The details hold
-       still while the media column scrolls past. When they are taller than the
-       viewport, --pdp-info-height (set by the script) lets them stick by
-       their bottom instead, so nothing is out of reach. */
+    /* The title sits 122px below the media top at 1280px. */
+    .pdp__info {
+      --pdp-info-lead: clamp(24px, 9.53vw, 160px);
+      padding-top: var(--pdp-info-lead);
+    }
+  }
+
+  /* Where there is room, the details hold still with the title 64px from the
+     top while the media scrolls past, releasing where the media ends. When
+     they are taller than the viewport, --pdp-info-height (set by the script)
+     lets them stick by their bottom instead, so nothing is out of reach.
+     Position, not motion, so it stays under reduced motion. */
+  @media (min-width: 1100px) {
     .pdp__info {
       position: sticky;
-      top: min(0px, calc(100vh - var(--pdp-info-height, 0px)));
-      padding-top: clamp(24px, 9.53vw, 160px);
+      top: min(
+        calc(64px - var(--pdp-info-lead)),
+        calc(100vh - var(--pdp-info-height, 0px))
+      );
     }
   }
 
