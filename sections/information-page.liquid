@@ -1,19 +1,20 @@
 {% comment %}
   Information page (Shipping & Returns, Contact, Legal, California Privacy, …):
-  the page's own title and rich text, set as one compact 11/15 column from the
-  1280px Figma. All copy is the Page's, edited in Shopify Admin; nothing is
-  written here. Used by templates/page.information.json.
+  the page's own title and rich text in 11/15 type. From 768px it sits on the
+  PDP's split: the title in the media column, and each Heading 2 of the rich
+  text a numbered row in the information column (01 SHIPPING | its text).
+  Phones keep one column. All copy is the Page's, edited in Shopify Admin;
+  nothing is written here, and the numbers are added by CSS, so headings carry
+  none. Used by templates/page.information.json.
 {% endcomment %}
 
 {%- assign title_id = 'InformationPageTitle-' | append: section.id -%}
 
 <article class="information-page full-width" aria-labelledby="{{ title_id }}">
-  <div class="information-page__content">
-    <h1 class="information-page__title" id="{{ title_id }}">{{ page.title | escape }}</h1>
+  <h1 class="information-page__title" id="{{ title_id }}">{{ page.title | escape }}</h1>
 
-    <div class="information-page__richtext">
-      {{ page.content }}
-    </div>
+  <div class="information-page__richtext">
+    {{ page.content }}
   </div>
 </article>
 
@@ -29,6 +30,8 @@
        the Figma's 405px Shipping block is its 27 lines set solid on the 15px
        grid. */
     --information-gap: 0;
+    /* 46%: the least that keeps quiet text at 4.5:1 on #1b1b1b (as the PDP). */
+    --information-quiet: color-mix(in srgb, #fff 46%, transparent);
 
     /* The header is 158px tall; the Figma's text starts at 163. */
     padding: 5px var(--split-gutter) 0;
@@ -42,11 +45,6 @@
     overflow-wrap: anywhere;
   }
 
-  .information-page__content {
-    max-width: 393px;
-    min-width: 0;
-  }
-
   /* Headings keep their meaning, not the browser's size or weight. :where()
      keeps these resets below the spacing rules that follow. */
   .information-page :where(h1, h2, h3, h4, h5, h6) {
@@ -57,7 +55,31 @@
   }
 
   .information-page__title {
-    margin-bottom: var(--information-gap);
+    margin-bottom: 15px;
+  }
+
+  .information-page__richtext {
+    min-width: 0;
+    counter-reset: information-section;
+  }
+
+  /* Each Heading 2 is a section, numbered 01, 02, … in the quiet tone. */
+  .information-page__richtext > h2 {
+    counter-increment: information-section;
+    /* A long name wraps under itself, not under its number. */
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 6px;
+  }
+
+  .information-page__richtext > h2::before {
+    content: counter(information-section, decimal-leading-zero);
+    color: var(--information-quiet);
+  }
+
+  /* Anything before the first section is an introduction, set quietly. */
+  .information-page__richtext > :not(h2, h2 ~ *) {
+    color: var(--information-quiet);
   }
 
   .information-page__richtext :where(p, ul, ol, h2, h3, h4, h5, h6, blockquote, table) {
@@ -79,6 +101,11 @@
     margin-top: 15px;
   }
 
+  /* A section starts one blank line below the one before it. */
+  .information-page__richtext > * + h2 {
+    margin-top: 15px;
+  }
+
   .information-page__richtext :is(ul, ol) {
     padding-left: 1.5em;
   }
@@ -97,6 +124,48 @@
   .information-page a:focus-visible {
     outline: 1px solid currentcolor;
     outline-offset: 2px;
+  }
+
+  /* The PDP's split (product.liquid, .pdp__grid). In the information column
+     each heading takes a 140px column and its text the rest, so a section's
+     first block shares the heading's row and the rest follow beneath it. */
+  @media (min-width: 768px) {
+    .information-page {
+      display: grid;
+      grid-template-columns: var(--split-columns);
+      column-gap: var(--split-gap);
+      align-items: start;
+      width: 100%;
+      max-width: calc(var(--split-max) + 2 * var(--split-gutter));
+      margin-inline: auto;
+    }
+
+    .information-page__title {
+      margin-bottom: 0;
+    }
+
+    .information-page__richtext {
+      display: grid;
+      grid-template-columns: 140px minmax(0, 1fr);
+      column-gap: 20px;
+    }
+
+    .information-page__richtext > * {
+      grid-column: 2;
+    }
+
+    .information-page__richtext > h2 {
+      grid-column: 1;
+    }
+
+    .information-page__richtext > :not(h2, h2 ~ *) {
+      grid-column: 1 / -1;
+    }
+
+    /* The block beside a heading starts with it, not above it. */
+    .information-page__richtext > * + h2 + * {
+      margin-top: 15px;
+    }
   }
 
   @media (max-width: 700px) {
