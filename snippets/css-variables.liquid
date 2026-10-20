@@ -26,7 +26,30 @@
     --color-background: {{ settings.background_color }};
     --color-foreground: {{ settings.foreground_color }};
     --grain-image: url('{{ 'grain.png' | asset_url }}');
-    --grain-opacity: {{ settings.grain_strength | default: 0 | divided_by: 100.0 }};
+    {%- comment -%}
+      The page is painted the colour the grain used to average out to (the
+      background lifted toward the noise's mid-grey), and the grain overlays
+      it, lightening and darkening equally. Same look as grey noise laid over
+      the background, but the page's own colour is now its true average, the
+      colour phone browsers take for their bars. Overlay's swing is the ground's
+      distance from black (or white, on a light ground) times the opacity, so
+      the opacity is scaled to keep the setting's strength; it never exceeds 1.
+    {%- endcomment -%}
+    {%- liquid
+      assign grain = settings.grain_strength | default: 0
+      assign ground_weight = 100 | minus: grain
+      assign ground = settings.background_color | color_mix: '#808080', ground_weight
+      assign ground_level = ground | color_brightness
+      if ground_level > 127.5
+        assign ground_level = 255 | minus: ground_level
+      endif
+      assign grain_opacity = 0
+      if grain > 0 and ground_level > 0
+        assign grain_opacity = grain | times: 255.0 | divided_by: 200 | divided_by: ground_level | at_most: 1
+      endif
+    -%}
+    --color-ground: {{ ground }};
+    --grain-opacity: {{ grain_opacity }};
     --style-border-radius-inputs: {{ settings.input_corner_radius }}px;
   }
 {% endstyle %}

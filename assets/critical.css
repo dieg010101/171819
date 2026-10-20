@@ -157,15 +157,18 @@ select:autofill {
   filter: none;
 }
 
+/* The ground: the background as the grain averages it (css-variables.liquid).
+   Safari takes this colour for its bars, so it must be the page's average. */
 body {
   font-family: var(--font-primary--family);
-  background-color: var(--color-background);
+  background-color: var(--color-ground, var(--color-background));
   color: var(--color-foreground);
 }
 
 /* Film grain in the page's background only, as the bird intro lays it on its
-   background beneath the birds: random grey at --grain-opacity (Theme
-   settings › Colors › Grain; 0 is off). z-index -1 paints it over the page
+   background beneath the birds: random grey overlaid on the ground (Theme
+   settings › Colors › Grain; 0 is off), so it lightens and darkens without
+   moving the average. z-index -1 paints it over the page
    colour but under all content, so photos and text stay clean; anything that
    paints its own background covers it. Fixed to the screen like the intro's,
    and one noise pixel per device pixel on high-density screens. It runs past
@@ -180,6 +183,7 @@ body::after {
   background-image: var(--grain-image);
   background-size: 128px;
   opacity: var(--grain-opacity, 0);
+  mix-blend-mode: overlay;
 }
 
 @media (min-resolution: 2dppx) {

@@ -2,9 +2,9 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 {%- comment -%}
-  The colour phone browsers give their own bars: the ground as the grain
-  leaves it on average (its mid-grey at the Grain strength), so the bars read
-  as the same surface. Not on the password page, whose image fills the screen.
+  The colour browsers that read theme-color give their own bars: the page's
+  ground (as css-variables.liquid computes it), so the bars read as the same
+  surface. Not on the password page, whose image fills the screen.
 {%- endcomment -%}
 {%- unless request.page_type == 'password' -%}
   {%- assign ground_weight = 100 | minus: settings.grain_strength -%}
