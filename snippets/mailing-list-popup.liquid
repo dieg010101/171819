@@ -157,9 +157,9 @@
     border: 0;
     border-radius: 0;
     background: none;
-    /* Muted → ink on hover, as the site's other text actions (Remove, Shop).
-       55% black keeps 4:1 on the #d9d9d9 panel. */
-    color: color-mix(in srgb, var(--mailing-list-ink) 55%, transparent);
+    /* Ink at rest, softening slightly on hover, as the site's other text
+       actions (header, Remove). */
+    color: var(--mailing-list-ink);
     font: inherit;
     letter-spacing: inherit;
     cursor: pointer;
@@ -167,7 +167,7 @@
   }
 
   .mailing-list__close:hover {
-    color: var(--mailing-list-ink);
+    color: color-mix(in srgb, var(--mailing-list-ink) 70%, transparent);
   }
 
   .mailing-list__close::before {

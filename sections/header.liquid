@@ -28,10 +28,9 @@
 
 {% stylesheet %}
   .site-header {
-    /* Foreground comes from the global theme colors; the background is the
-       page's own (with its grain) showing through. The hover tint has no
-       global equivalent yet, so it stays local. */
-    --site-header-fg-hover: #e8e8e8;
+    /* White, greying slightly on hover (--ink-hover, critical.css). The
+       background is the page's own (with its grain) showing through. */
+    --site-header-ink: #fff;
 
     display: grid;
     /* Outer columns flex equally, so the centre column stays optically centred
@@ -67,7 +66,7 @@
     text-transform: uppercase;
     text-decoration: none;
     white-space: nowrap;
-    color: var(--color-foreground);
+    color: var(--site-header-ink);
     transition: color 0.15s ease;
     /* Grow the touch target to ~44px without moving the text: the padding and the
        negative margin cancel out, so only the hit area changes. */
@@ -84,7 +83,7 @@
     text-decoration: none;
     font-size: 32px;
     line-height: 30px;
-    color: var(--color-foreground);
+    color: var(--site-header-ink);
     transition: color 0.15s ease;
   }
 
@@ -104,11 +103,11 @@
 
   .site-header__link:hover,
   .site-header__brand:hover {
-    color: var(--site-header-fg-hover);
+    color: var(--ink-hover);
   }
 
   .site-header a:focus-visible {
-    outline: 1px solid var(--site-header-fg-hover);
+    outline: 1px solid var(--site-header-ink);
     outline-offset: 4px;
   }
 

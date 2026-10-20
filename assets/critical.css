@@ -89,6 +89,10 @@ p:empty {
      ends level with the bottom of the media column. */
   --site-footer-gap: 4rem;
   --site-footer-block: 62px;
+
+  /* Text actions (header, Remove, Back to shopping, …) are white at rest and
+     grey slightly on hover. Opaque, so the grain never shows through text. */
+  --ink-hover: color-mix(in srgb, #fff 80%, var(--color-background));
 }
 
 @media (max-width: 700px) {
