@@ -377,6 +377,12 @@
       }
 
       dialog.addEventListener('cancel', remember); // Esc
+
+      // A page restored by Back (the back/forward cache) comes back as it was
+      // left, popup and all; once dismissed, it stays closed.
+      window.addEventListener('pageshow', function (event) {
+        if (event.persisted && dialog.open && isDismissed()) dialog.close();
+      });
       dialog.addEventListener('close', function () {
         remember();
         restoreFocus();
@@ -404,6 +410,9 @@
         var showResult = function () {
           setTimeout(function () {
             open(document.querySelector('[data-mailing-list-open][aria-controls="' + dialog.id + '"]'));
+            // Show the result once: drop the #hash from this history entry, or
+            // coming Back to it later reopens the popup.
+            history.replaceState(history.state, '', window.location.pathname + window.location.search);
           }, 0);
         };
         if (document.readyState === 'complete') showResult();

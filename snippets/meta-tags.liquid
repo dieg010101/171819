@@ -1,6 +1,15 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+{%- comment -%}
+  The colour phone browsers give their own bars: the ground as the grain
+  leaves it on average (its mid-grey at the Grain strength), so the bars read
+  as the same surface. Not on the password page, whose image fills the screen.
+{%- endcomment -%}
+{%- unless request.page_type == 'password' -%}
+  {%- assign ground_weight = 100 | minus: settings.grain_strength -%}
+  <meta name="theme-color" content="{{ settings.background_color | color_mix: '#808080', ground_weight }}">
+{%- endunless %}
 <script>
   // iOS zooms the page into any field set under 16px when it's tapped, and
   // the theme's fields are 11px. maximum-scale stops that zoom; iOS still
