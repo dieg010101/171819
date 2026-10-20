@@ -171,13 +171,13 @@ body {
    moving the average. z-index -1 paints it over the page
    colour but under all content, so photos and text stay clean; anything that
    paints its own background covers it. Fixed to the screen like the intro's,
-   and one noise pixel per device pixel on high-density screens. It runs past
-   the screen's top and bottom, so it also lies under a phone browser's
-   translucent bars and its overscroll bounce. */
+   and one noise pixel per device pixel on high-density screens. Kept to the
+   screen: past the page's edges (a phone's overscroll bounce) there is no
+   ground for it to overlay, and it would show as raw grey static. */
 body::after {
   content: '';
   position: fixed;
-  inset: -50vh 0;
+  inset: 0;
   z-index: -1;
   pointer-events: none;
   background-image: var(--grain-image);
@@ -204,7 +204,12 @@ main:focus {
   outline: none;
 }
 
-/* Hidden until focused, then shown in the header's link voice. */
+/* Clipped away until focused, then shown in the header's link voice. Clipped,
+   not parked above the page, where a phone's overscroll bounce would reveal it. */
+.skip-link:not(:focus) {
+  clip-path: inset(50%);
+}
+
 .skip-link {
   position: absolute;
   top: 0.5rem;
@@ -218,11 +223,9 @@ main:focus {
   letter-spacing: 0.02em;
   text-transform: uppercase;
   text-decoration: none;
-  translate: 0 calc(-100% - 1rem);
 }
 
 .skip-link:focus {
-  translate: 0 0;
   outline: 1px solid var(--color-foreground);
   outline-offset: 4px;
 }
