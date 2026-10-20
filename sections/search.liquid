@@ -191,6 +191,12 @@
     border-bottom-color: #fff;
   }
 
+  /* Text fields count as focus-visible even when tapped; the brightened
+     rule above is the field's focus, so it takes no ring as well. */
+  .search-page .search-page__input:focus-visible {
+    outline: none;
+  }
+
   /* Text links and buttons share one treatment; the padding and negative
      margin grow the hit area to 27px without moving the text. */
   .search-page__submit,

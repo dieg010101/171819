@@ -453,6 +453,13 @@
     outline-offset: 2px;
   }
 
+  /* Text fields count as focus-visible even when tapped, so the quantity
+     field shows the site's field underline instead of a ring. */
+  .pdp .pdp__qty-input:focus-visible {
+    outline: none;
+    box-shadow: 0 1px 0 currentcolor;
+  }
+
   /* --- Media --------------------------------------------------------------- */
 
   .pdp__media {

@@ -119,6 +119,44 @@ html {
   }
 }
 
+/* Taps draw no grey/blue box over links and buttons on phones; focus styles
+   still show for keyboard users. */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Selected text as the popup's inversion shows it: the brand yellow, with
+   white type turned to its difference, blue (|#fff − #e3c51d| = #1c3ae2;
+   5:1). */
+::selection {
+  background-color: #e3c51d;
+  color: #1c3ae2;
+}
+
+/* Autofill looks like typing. Browsers paint autofilled fields their own
+   colours with !important, so: the background change is held off
+   indefinitely, the text keeps the field's ink (--field-ink: white, or a
+   light panel's black where that panel sets it), and Firefox's tint filter
+   is removed. The border transition stays, as the fields set it. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: var(--field-ink, #fff);
+  caret-color: var(--field-ink, #fff);
+  transition:
+    border-color 150ms ease,
+    background-color 0s 600000s,
+    color 0s 600000s;
+}
+
+input:autofill,
+textarea:autofill,
+select:autofill {
+  filter: none;
+}
+
 body {
   font-family: var(--font-primary--family);
   background-color: var(--color-background);

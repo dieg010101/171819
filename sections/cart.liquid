@@ -257,6 +257,18 @@
     outline-offset: 2px;
   }
 
+  /* Text fields count as focus-visible even when tapped, so the quantity
+     field shows the site's field underline instead of a ring. */
+  .cart .cart__qty-input:focus-visible {
+    outline: none;
+    box-shadow: 0 1px 0 currentcolor;
+  }
+
+  /* Focus returned after a mouse-driven reload (see the script below). */
+  .cart [data-cart-quiet-focus]:focus-visible {
+    outline: none;
+  }
+
   .cart p {
     margin: 0;
   }
@@ -721,6 +733,9 @@
       var changeUrl = root.dataset.changeUrl + '.js';
       var cartUrl = root.dataset.cartUrl + '.js';
       var busy = false;
+      // Whether the change came from the keyboard, so the focus returned after
+      // the reload only shows its ring to someone who navigates by keys.
+      var keyed = false;
 
       function lineFor(key) {
         var lines = root.querySelectorAll('[data-cart-line]');
@@ -750,6 +765,7 @@
       }
 
       function reload(flash) {
+        flash.keyed = keyed;
         writeFlash(flash);
         window.location.reload();
       }
@@ -791,7 +807,9 @@
       }
 
       root.querySelectorAll('[data-cart-step]').forEach(function (button) {
-        button.addEventListener('click', function () {
+        button.addEventListener('click', function (event) {
+          // A pointer click has a click count; one made with Enter or Space has none.
+          keyed = event.detail === 0;
           var line = button.closest('[data-cart-line]');
           var input = line.querySelector('[data-cart-qty]');
           var step = Number(button.dataset.cartStep) || 0;
@@ -807,6 +825,7 @@
         function commit() {
           var next = Math.max(0, Math.floor(Number(input.value)) || 0);
           if (next === Number(input.defaultValue)) return;
+          keyed = true;
           change(input.closest('[data-cart-line]'), next, 'input');
         }
         input.addEventListener('change', commit);
@@ -824,7 +843,22 @@
       if (flash) {
         var line = lineFor(flash.key);
         var target = control(line, flash.focus);
-        if (target) target.focus({ preventScroll: false });
+        if (target) {
+          // Focus set by script on a fresh page draws the keyboard ring, which
+          // a shopper who clicked +/− never asked for: keep it hidden until
+          // they next press a key. Screen readers still land on the control.
+          if (!flash.keyed) {
+            target.setAttribute('data-cart-quiet-focus', '');
+            var unquiet = function () {
+              target.removeAttribute('data-cart-quiet-focus');
+              document.removeEventListener('keydown', unquiet);
+              target.removeEventListener('blur', unquiet);
+            };
+            document.addEventListener('keydown', unquiet);
+            target.addEventListener('blur', unquiet);
+          }
+          target.focus({ preventScroll: false });
+        }
         if (flash.message) {
           // Let the live region settle before filling it so it is announced.
           setTimeout(function () { showMessage(line, flash.message); }, 150);

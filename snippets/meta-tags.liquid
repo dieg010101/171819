@@ -1,6 +1,15 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  // iOS zooms the page into any field set under 16px when it's tapped, and
+  // the theme's fields are 11px. maximum-scale stops that zoom; iOS still
+  // lets people pinch-zoom (it ignores maximum-scale for gestures), but
+  // Android would not, so this is limited to iPhone and iPad.
+  if (/iP(hone|od|ad)/.test(navigator.platform) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+    document.querySelector('meta[name="viewport"]').content += ',maximum-scale=1';
+  }
+</script>
 
 {%- liquid
   assign og_title = page_title | default: shop.name

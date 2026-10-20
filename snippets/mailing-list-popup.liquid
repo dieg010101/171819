@@ -29,6 +29,8 @@
   class="mailing-list"
   id="MailingList"
   aria-labelledby="MailingListTitle"
+  autofocus
+  tabindex="-1"
   scroll-lock
   data-mailing-list
   data-auto-open="{{ auto_open | default: false }}"
@@ -65,6 +67,8 @@
 {% stylesheet %}
   .mailing-list {
     --mailing-list-ink: #000;
+    /* Autofilled email keeps this ink (critical.css). */
+    --field-ink: var(--mailing-list-ink);
 
     container-type: inline-size;
     /* 432px at full size; narrower on small screens, and never taller than the
@@ -87,6 +91,12 @@
     font-size: 11px;
     line-height: 12px;
     letter-spacing: -0.05em;
+  }
+
+  /* Focused itself on opening (see the script); the popup needs no ring
+     around it, and its controls keep theirs. */
+  .mailing-list:focus {
+    outline: none;
   }
 
   /* The storefront, seen through the Figma's #E3C51D difference layer. */
@@ -344,11 +354,11 @@
       function open(trigger) {
         if (!dialog.isConnected || dialog.open || document.querySelector('dialog[open]')) return;
         opener = trigger || null;
+        // `autofocus` on the dialog has showModal() focus the dialog itself, not
+        // the x: opened on a timer, focusing a control would draw its keyboard
+        // ring for no reason. Tab then reaches the x and the field.
         dialog.showModal();
-        // showModal() normally focuses the first control; make sure it did.
-        if (!dialog.contains(document.activeElement)) {
-          dialog.querySelector('[data-mailing-list-close]').focus();
-        }
+        if (!dialog.contains(document.activeElement)) dialog.focus();
       }
       dialog.mailingListOpen = open;
 
