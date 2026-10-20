@@ -259,6 +259,46 @@
                   </label>
                 {%- endfor -%}
               </div>
+
+              {%- comment -%}
+                Phones: the same choice as one "Size … 30 ⌄" row, opening the
+                phone's own picker (the wheel on iPhone). The select is
+                invisible over the row; the script mirrors it onto the radios
+                above, which stay the source of truth. Sold-out values can't be
+                picked here when there is only one option, so nothing traps a
+                choice of another option behind them.
+              {%- endcomment -%}
+              <div class="pdp__picker" data-pdp-picker>
+                <span aria-hidden="true">{{ option.name }}</span>
+                <span class="pdp__picker-value" aria-hidden="true">
+                  <span data-pdp-picker-value>{{ option.selected_value }}</span>
+                  {%- render 'icon-chevron-down', class: 'pdp__picker-chevron' -%}
+                </span>
+                <select class="pdp__picker-select" aria-label="{{ option.name | escape }}" data-pdp-picker-select>
+                  {%- for value in option.values -%}
+                    {%- liquid
+                      assign state = 'available'
+                      if value.variant == blank
+                        assign state = 'unavailable'
+                      elsif value.available == false
+                        assign state = 'soldout'
+                      endif
+                    -%}
+                    <option
+                      value="{{ value | escape }}"
+                      {% if value.selected %}
+                        selected
+                      {% endif %}
+                      {% if state == 'soldout' and product.options.size == 1 %}
+                        disabled
+                      {% endif %}
+                    >
+                      {{- value -}}
+                      {%- if state == 'soldout' %} — Sold out{% elsif state == 'unavailable' %} — Unavailable{% endif -%}
+                    </option>
+                  {%- endfor -%}
+                </select>
+              </div>
             </fieldset>
           {%- endfor -%}
         </div>
@@ -676,6 +716,51 @@
     text-decoration-color: color-mix(in srgb, currentcolor 76%, transparent);
   }
 
+  /* Phones only (see the 700px block below): one ruled row, the hairline 6px
+     under its text as in the Figma's M1. The select covers the whole row,
+     invisible, so any tap opens the picker. */
+  .pdp__picker {
+    position: relative;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--pdp-hairline);
+  }
+
+  .pdp__picker-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pdp__picker[data-state='soldout'] .pdp__picker-value,
+  .pdp__picker[data-state='unavailable'] .pdp__picker-value {
+    color: var(--pdp-quiet);
+  }
+
+  .pdp__picker-chevron {
+    flex: none;
+  }
+
+  /* 16px, so iOS doesn't zoom to it. */
+  .pdp__picker-select {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    font-size: 16px;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .pdp__picker:has(.pdp__picker-select:focus-visible) {
+    outline: 1px solid var(--pdp-ink);
+    outline-offset: 2px;
+  }
+
   .pdp__form {
     margin-top: 21px;
   }
@@ -837,6 +922,12 @@
     justify-self: start;
   }
 
+  /* The phone's "CM ⌄" ends flush with the column, under the toggle's "-". */
+  .pdp__panel--size-guide .size-guide__picker {
+    grid-column: 3;
+    justify-self: end;
+  }
+
   .pdp__panel--size-guide .size-guide__body {
     grid-column: 1 / -1;
     justify-self: end;
@@ -917,6 +1008,19 @@
     .pdp {
       padding-top: 4px;
     }
+
+    /* Phone pickers: sizes as one row opening the phone's own wheel, in place
+       of the laid-out figures. To go back to the laid-out sizes on phones,
+       comment out these two rules (and the size guide's matching block in
+       snippets/product-size-guide.liquid for its CM / IN). */
+    .pdp__values {
+      display: none;
+    }
+
+    .pdp__picker {
+      display: flex;
+    }
+    /* End phone pickers. */
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -1063,9 +1167,45 @@
             label.dataset.state = state;
             var note = label.querySelector('[data-pdp-value-state]');
             if (note) note.textContent = state === 'soldout' ? ', sold out' : state === 'unavailable' ? ', unavailable' : '';
+            if (input.checked && pickers[i]) pickers[i].dataset.state = state;
           });
+          syncPicker(i, options[i]);
         });
       }
+
+      /* ---------- Phone pickers ---------- */
+
+      // One select per option, mirrored onto that option's radios: the radios
+      // stay the source of truth, so everything else is unchanged.
+      var pickers = fieldsets.map(function (fs) { return fs.querySelector('[data-pdp-picker]'); });
+
+      function syncPicker(i, value) {
+        var picker = pickers[i];
+        if (!picker) return;
+        var pickerSelect = picker.querySelector('[data-pdp-picker-select]');
+        Array.prototype.forEach.call(pickerSelect.options, function (opt) {
+          var input = Array.prototype.find.call(fieldsets[i].querySelectorAll('input'), function (r) { return r.value === opt.value; });
+          var state = input ? input.nextElementSibling.dataset.state : 'available';
+          opt.textContent = opt.value + (state === 'soldout' ? ' — Sold out' : state === 'unavailable' ? ' — Unavailable' : '');
+          opt.disabled = state === 'soldout' && fieldsets.length === 1;
+        });
+        if (value !== null) pickerSelect.value = value;
+        picker.querySelector('[data-pdp-picker-value]').textContent = value === null ? '' : value;
+      }
+
+      // Runs before the fieldset's own change listener (the event bubbles to
+      // it next), so that listener reads the newly checked radio.
+      pickers.forEach(function (picker, i) {
+        if (!picker) return;
+        picker.querySelector('[data-pdp-picker-select]').addEventListener('change', function (event) {
+          fieldsets[i].querySelectorAll('input').forEach(function (input) {
+            input.checked = input.value === event.target.value;
+          });
+        });
+      });
+
+      // Gives the pickers their starting state (a sold-out selection shows quiet).
+      updateValueStates(selectedOptions());
 
       function render(variant, announce) {
         var state = !variant ? 'unavailable' : variant.available ? 'available' : 'soldout';

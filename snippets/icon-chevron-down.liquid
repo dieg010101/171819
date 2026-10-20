@@ -1,0 +1,13 @@
+{% doc %}
+  The thin chevron that marks a row as opening a picker, as drawn in the
+  Figma's phone frames. Decorative; sized and coloured by the caller (it takes
+  currentcolor).
+
+  @param {string} [class] - Class for the svg
+
+  @example
+  {% render 'icon-chevron-down', class: 'pdp__picker-chevron' %}
+{% enddoc %}
+<svg class="{{ class }}" width="11" height="6" viewBox="0 0 11 6" fill="none" aria-hidden="true" focusable="false">
+  <path d="M.5.5l5 5 5-5" stroke="currentColor" stroke-width="1"/>
+</svg>

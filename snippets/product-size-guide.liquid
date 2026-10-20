@@ -42,6 +42,22 @@
     {%- endfor -%}
   </div>
 
+  {%- comment -%}
+    Phones: the unit as one "CM ⌄" that opens the phone's own picker; the
+    select is invisible over it. Shown in place of the switch above on
+    phones (see the phone pickers block below).
+  {%- endcomment -%}
+  <div class="size-guide__picker" data-size-guide-picker>
+    <span class="size-guide__picker-value" aria-hidden="true">
+      <span data-size-guide-picker-value>{{ authored_unit | upcase }}</span>
+      {%- render 'icon-chevron-down', class: 'size-guide__picker-chevron' -%}
+    </span>
+    <select class="size-guide__picker-select" aria-label="Units" data-size-guide-unit-select>
+      <option value="cm" {% if authored_unit == 'cm' %}selected{% endif %}>Centimetres (CM)</option>
+      <option value="in" {% if authored_unit == 'in' %}selected{% endif %}>Inches (IN)</option>
+    </select>
+  </div>
+
   <div class="size-guide__body">
     <div class="size-guide__scroll">
       <table class="size-guide__table">
@@ -85,7 +101,8 @@
 {%- comment -%} The switch needs JS; without it the values simply stay in their authored unit. {%- endcomment -%}
 <noscript>
   <style>
-    .size-guide__units { display: none; }
+    .size-guide__units,
+    .size-guide__picker { display: none !important; }
   </style>
 </noscript>
 
@@ -163,6 +180,46 @@
     outline: 1px solid currentcolor;
     outline-offset: 2px;
   }
+
+  .size-guide__picker {
+    position: relative;
+    display: none;
+  }
+
+  .size-guide__picker-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 11px;
+  }
+
+  /* 16px, so iOS doesn't zoom to it. */
+  .size-guide__picker-select {
+    position: absolute;
+    inset: -8px -10px;
+    opacity: 0;
+    font-size: 16px;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .size-guide__picker:has(.size-guide__picker-select:focus-visible) {
+    outline: 1px solid currentcolor;
+    outline-offset: 2px;
+  }
+
+  /* Phone pickers (with the product page's matching block): to go back to the
+     laid-out CM / IN on phones, comment out this block. */
+  @media (max-width: 700px) {
+    .size-guide__units {
+      display: none;
+    }
+
+    .size-guide__picker {
+      display: block;
+    }
+  }
+  /* End phone pickers. */
 
   .size-guide__body {
     width: max-content;
@@ -286,6 +343,10 @@
       guide.querySelectorAll('[data-size-guide-unit-option]').forEach(function (button) {
         button.setAttribute('aria-pressed', String(button.dataset.sizeGuideUnitOption === unit));
       });
+      var picker = guide.querySelector('[data-size-guide-unit-select]');
+      if (picker) picker.value = unit;
+      var pickerValue = guide.querySelector('[data-size-guide-picker-value]');
+      if (pickerValue) pickerValue.textContent = unit.toUpperCase();
       var caption = guide.querySelector('[data-size-guide-caption]');
       if (caption) caption.textContent = 'Measurements in ' + UNIT_NAMES[unit];
     }
@@ -295,6 +356,13 @@
       if (!button) return;
       var guide = button.closest('[data-size-guide]');
       if (guide) setUnit(guide, button.dataset.sizeGuideUnitOption);
+    });
+
+    document.addEventListener('change', function (event) {
+      var picker = event.target.closest('[data-size-guide-unit-select]');
+      if (!picker) return;
+      var guide = picker.closest('[data-size-guide]');
+      if (guide) setUnit(guide, picker.value);
     });
 
     if (document.readyState === 'loading') {
