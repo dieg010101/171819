@@ -30,6 +30,25 @@
     {% # Load and preload the critical CSS %}
     {{ 'critical.css' | asset_url | stylesheet_tag: preload: true }}
 
+    <script>
+      // Focus rings are for keyboard users, but browsers also draw them after
+      // a tap or click when a script moves focus (a dialog handing focus back
+      // to the button that opened it). So <html> carries data-pointer from the
+      // last tap or click until the keyboard is used to move around; typing
+      // in a field doesn't count. critical.css hides the rings meanwhile.
+      (function () {
+        var root = document.documentElement;
+        addEventListener('pointerdown', function () {
+          root.setAttribute('data-pointer', '');
+        }, true);
+        addEventListener('keydown', function (event) {
+          if (event.key === 'Tab' || !event.target.closest('input, textarea, select, [contenteditable]')) {
+            root.removeAttribute('data-pointer');
+          }
+        }, true);
+      })();
+    </script>
+
     {% # Social, title, etc. %}
     {% render 'meta-tags' %}
 

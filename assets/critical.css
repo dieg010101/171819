@@ -125,6 +125,14 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* No focus rings after a tap or click, anywhere (see the data-pointer script
+   in layout/theme.liquid); every outline in the theme is a focus ring.
+   !important because each component's own ring is more specific. Indicators
+   that aren't outlines, such as a field's rule turning white, still show. */
+html[data-pointer] * {
+  outline: none !important;
+}
+
 /* Selected text as the popup's inversion shows it: the brand yellow, with
    white type turned to its difference, blue (|#fff − #e3c51d| = #1c3ae2;
    5:1). */
