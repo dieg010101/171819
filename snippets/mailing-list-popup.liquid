@@ -354,11 +354,12 @@
       function open(trigger) {
         if (!dialog.isConnected || dialog.open || document.querySelector('dialog[open]')) return;
         opener = trigger || null;
-        // `autofocus` on the dialog has showModal() focus the dialog itself, not
-        // the x: opened on a timer, focusing a control would draw its keyboard
-        // ring for no reason. Tab then reaches the x and the field.
+        // Focus the dialog itself, not the x showModal() picks: opened on a
+        // timer, focusing a control would draw its keyboard ring for no
+        // reason. (`autofocus` asks for this; not every browser obeys.) Tab
+        // then reaches the x and the field.
         dialog.showModal();
-        if (!dialog.contains(document.activeElement)) dialog.focus();
+        dialog.focus();
       }
       dialog.mailingListOpen = open;
 
