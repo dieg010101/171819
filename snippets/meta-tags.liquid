@@ -20,6 +20,15 @@
   }
 </script>
 
+{%- comment -%}
+  One square image serves both: 32px for tabs and bookmarks, 180px for the
+  iPhone home screen (which also stands in when a link preview has no image).
+{%- endcomment -%}
+{%- if settings.favicon != blank -%}
+  <link rel="icon" type="image/png" href="{{ settings.favicon | image_url: width: 32, height: 32 }}">
+  <link rel="apple-touch-icon" href="{{ settings.favicon | image_url: width: 180, height: 180 }}">
+{%- endif %}
+
 {%- liquid
   assign og_title = page_title | default: shop.name
   assign og_url = canonical_url | default: request.origin

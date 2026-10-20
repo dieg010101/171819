@@ -96,5 +96,16 @@
         "default": 4
       }
     ]
+  },
+  {
+    "name": "Favicon",
+    "settings": [
+      {
+        "type": "image_picker",
+        "id": "favicon",
+        "label": "Favicon",
+        "info": "A square PNG, at least 180 × 180 px. Shown in browser tabs and bookmarks, and as the icon when the site is added to an iPhone home screen."
+      }
+    ]
   }
 ]
