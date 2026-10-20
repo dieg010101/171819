@@ -35,8 +35,8 @@
 // -----------------------------------------------------------------------------
 const CONFIG = {
   theme: {
-    background: [27, 27, 26], // flat charcoal (reference)
-    vignette: [10, 10, 10],
+    background: [14, 13, 11], // warm black, the site's --color-background
+    vignette: [5, 4, 3],
     vignetteStrength: 0.3, // 0 = none
     grain: 0.06, // film-grain alpha, 0 = off (also dithers the vignette)
     bird: [206, 206, 201], // pale grey birds

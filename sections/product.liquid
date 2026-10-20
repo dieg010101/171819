@@ -403,9 +403,9 @@
   */
   .pdp {
     --pdp-ink: #fff;
-    /* 46%: the least that keeps quiet text at 4.5:1 on #1b1b1b. */
+    /* 46%: set for 4.5:1 on the old #1b1b1b; more on today's darker ground. */
     --pdp-quiet: color-mix(in srgb, var(--pdp-ink) 46%, transparent);
-    /* The Figma's 0.15px white rules, as they actually render on #1b1b1b. */
+    /* The Figma's 0.15px white rules, as they actually render on a dark ground. */
     --pdp-hairline: color-mix(in srgb, var(--pdp-ink) 24%, transparent);
     /* The selected value's underline is its only state cue, so it needs 3:1. */
     --pdp-selected-line: color-mix(in srgb, var(--pdp-ink) 35%, transparent);

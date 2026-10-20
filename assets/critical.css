@@ -121,6 +121,28 @@ body {
   color: var(--color-foreground);
 }
 
+/* Film grain over the whole page, as the bird intro lays it over its
+   background: random grey at --grain-opacity (Theme settings › Colors ›
+   Grain; 0 is off). Fixed to the screen like the intro's, never caught by
+   clicks, and under the intro itself (z-index 9999), which has its own. One
+   noise pixel per device pixel on high-density screens, as in the intro. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  background-image: var(--grain-image);
+  background-size: 128px;
+  opacity: var(--grain-opacity, 0);
+}
+
+@media (min-resolution: 2dppx) {
+  body::after {
+    background-size: 64px;
+  }
+}
+
 /* Sections keep the flex-column context they had as direct children of <body>,
    so section rules written against it (e.g. the cover flow's height) still hold. */
 main {
@@ -220,7 +242,7 @@ main:focus {
   inset: 0;
   z-index: 9999;
   overflow: hidden;
-  background-color: #1b1b1a;
+  background-color: #0e0d0b;
 }
 
 .flock-intro.is-ready {

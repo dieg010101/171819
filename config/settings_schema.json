@@ -65,8 +65,19 @@
       {
         "type": "color",
         "id": "background_color",
-        "default": "#1B1B1B",
+        "default": "#0E0D0B",
         "label": "t:labels.background"
+      },
+      {
+        "type": "range",
+        "id": "grain_strength",
+        "min": 0,
+        "max": 12,
+        "step": 1,
+        "unit": "%",
+        "default": 6,
+        "label": "Grain",
+        "info": "Film grain over the whole site, as in the bird intro. 0 turns it off."
       },
       {
         "type": "color",
