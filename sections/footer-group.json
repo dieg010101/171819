@@ -14,14 +14,14 @@
     "footer": {
       "type": "footer",
       "settings": {
-        "instagram_url": "",
+        "instagram_url": "https://www.instagram.com/seventeeneighteennineteen/",
         "shipping_returns_url": "shopify://pages/shipping-returns",
         "contact_url": "shopify://pages/contact",
         "legal_url": "shopify://pages/legal",
         "california_privacy_url": "shopify://pages/california-privacy",
-        "show_payment_icons": true,
+        "show_payment_icons": false,
         "mailing_list_image": "shopify://shop_images/IMG_2249.jpg",
-        "mailing_list_auto_open": true,
+        "mailing_list_auto_open": false,
         "mailing_list_delay": 5
       }
     }
