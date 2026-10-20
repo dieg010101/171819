@@ -756,7 +756,9 @@
     appearance: none;
   }
 
-  .pdp__picker:has(.pdp__picker-select:focus-visible) {
+  /* Keyboard focus only: browsers count a tapped select as focus-visible, so
+     the script marks focus that came from a tap or click (data-pointer). */
+  .pdp__picker:not([data-pointer]):has(.pdp__picker-select:focus-visible) {
     outline: 1px solid var(--pdp-ink);
     outline-offset: 2px;
   }
@@ -1197,7 +1199,10 @@
       // it next), so that listener reads the newly checked radio.
       pickers.forEach(function (picker, i) {
         if (!picker) return;
-        picker.querySelector('[data-pdp-picker-select]').addEventListener('change', function (event) {
+        var pickerSelect = picker.querySelector('[data-pdp-picker-select]');
+        picker.addEventListener('pointerdown', function () { picker.dataset.pointer = ''; });
+        pickerSelect.addEventListener('blur', function () { delete picker.dataset.pointer; });
+        pickerSelect.addEventListener('change', function (event) {
           fieldsets[i].querySelectorAll('input').forEach(function (input) {
             input.checked = input.value === event.target.value;
           });

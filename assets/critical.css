@@ -292,13 +292,17 @@ main:focus {
  * charcoal here is only a pre-p5 fallback so there is no white flash; once the
  * canvas exists, `is-ready` makes the shell transparent so the p5 background
  * alone controls the reveal.
+ * The fallback is the ground, not the bare background: Safari takes its bar
+ * colour from a full-screen fixed layer like this one as the page loads, and
+ * the ground is what the canvas (background plus grain) averages to, as the
+ * rest of the site is painted.
  */
 .flock-intro {
   position: fixed;
   inset: 0;
   z-index: 9999;
   overflow: hidden;
-  background-color: #0e0d0b;
+  background-color: var(--color-ground, #0e0d0b);
 }
 
 .flock-intro.is-ready {

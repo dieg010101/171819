@@ -203,7 +203,9 @@
     appearance: none;
   }
 
-  .size-guide__picker:has(.size-guide__picker-select:focus-visible) {
+  /* Keyboard focus only: browsers count a tapped select as focus-visible, so
+     the script marks focus that came from a tap or click (data-pointer). */
+  .size-guide__picker:not([data-pointer]):has(.size-guide__picker-select:focus-visible) {
     outline: 1px solid currentcolor;
     outline-offset: 2px;
   }
@@ -356,6 +358,16 @@
       if (!button) return;
       var guide = button.closest('[data-size-guide]');
       if (guide) setUnit(guide, button.dataset.sizeGuideUnitOption);
+    });
+
+    document.addEventListener('pointerdown', function (event) {
+      var picker = event.target.closest('[data-size-guide-picker]');
+      if (picker) picker.dataset.pointer = '';
+    });
+
+    document.addEventListener('focusout', function (event) {
+      var picker = event.target.closest('[data-size-guide-picker]');
+      if (picker) delete picker.dataset.pointer;
     });
 
     document.addEventListener('change', function (event) {
