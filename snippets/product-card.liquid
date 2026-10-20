@@ -179,12 +179,10 @@
     color: var(--product-card-quiet);
   }
 
-  /* Words, not colour, carry the state. */
+  /* Words, not colour, carry the state; set quietly beside the price, as the
+     struck-through price is, in the card's own voice. */
   .product-card__soldout {
-    font-size: 11px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--color-foreground);
+    color: var(--product-card-quiet);
   }
 
   @media (prefers-reduced-motion: reduce) {

@@ -198,7 +198,8 @@
         </p>
 
         {%- comment -%} Lives beside the price, outside the form; `form` still submits it with the product form. {%- endcomment -%}
-        <div class="pdp__qty">
+        {%- comment -%} Set quiet and switched off while the selection can't be bought. {%- endcomment -%}
+        <div class="pdp__qty" data-pdp-qty-row {% unless current_variant.available %}data-unavailable{% endunless %}>
           <label class="pdp__qty-label" for="Quantity-{{ section.id }}">Quantity</label>
           <input
             class="pdp__qty-input"
@@ -210,11 +211,12 @@
             value="1"
             inputmode="numeric"
             data-pdp-qty-input
+            {% unless current_variant.available %}disabled{% endunless %}
           >
-          <button class="pdp__qty-btn" type="button" data-pdp-qty="-1" aria-label="Decrease quantity">
+          <button class="pdp__qty-btn" type="button" data-pdp-qty="-1" aria-label="Decrease quantity" {% unless current_variant.available %}disabled{% endunless %}>
             <span aria-hidden="true">-</span>
           </button>
-          <button class="pdp__qty-btn" type="button" data-pdp-qty="1" aria-label="Increase quantity">
+          <button class="pdp__qty-btn" type="button" data-pdp-qty="1" aria-label="Increase quantity" {% unless current_variant.available %}disabled{% endunless %}>
             <span aria-hidden="true">+</span>
           </button>
         </div>
@@ -590,8 +592,14 @@
     inset: -8px -10px;
   }
 
-  .pdp__qty-btn[aria-disabled='true'] {
+  .pdp__qty-btn[aria-disabled='true'],
+  .pdp__qty-btn:disabled {
     cursor: default;
+  }
+
+  /* Nothing to count while the selection is sold out or unavailable. */
+  .pdp__qty[data-unavailable] {
+    color: var(--pdp-quiet);
   }
 
   /* Sizes: plain figures; the selected one carries a short rule beneath it. */
@@ -958,6 +966,7 @@
       var select = root.querySelector('[data-pdp-variant-select]');
       var submit = root.querySelector('[data-pdp-submit]');
       var dynamic = root.querySelector('[data-pdp-dynamic]');
+      var qtyRow = root.querySelector('[data-pdp-qty-row]');
       var price = root.querySelector('[data-pdp-price]');
       var priceLabel = root.querySelector('[data-pdp-price-label]');
       var compare = root.querySelector('[data-pdp-compare]');
@@ -1079,6 +1088,12 @@
           state === 'available' ? submit.dataset.labelAdd :
           state === 'soldout' ? submit.dataset.labelSoldout : submit.dataset.labelUnavailable;
         if (dynamic) dynamic.hidden = state !== 'available';
+        if (qtyRow) {
+          qtyRow.toggleAttribute('data-unavailable', state !== 'available');
+          qtyRow.querySelectorAll('input, button').forEach(function (control) {
+            control.disabled = state !== 'available';
+          });
+        }
 
         if (variant && variant.media) {
           var slideIndex = slides.findIndex(function (s) { return s.dataset.mediaId === String(variant.media); });
