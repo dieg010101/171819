@@ -30,7 +30,29 @@
 {%- endif %}
 
 {%- liquid
-  assign og_title = page_title | default: shop.name
+  # Titles are the page's own name, without the shop name after it (the
+  # favicon marks the tab), and Shopify's wordy defaults are renamed.
+  assign tab_title = page_title
+  case request.page_type
+    when 'collection'
+      if collection.handle == 'all'
+        assign tab_title = 'Shop'
+      endif
+    when 'cart'
+      assign tab_title = 'Cart'
+    when '404'
+      assign tab_title = 'Not found'
+    when 'search'
+      if search.performed
+        assign search_terms = search.terms | escape
+        assign tab_title = 'Search: ' | append: search_terms
+      else
+        assign tab_title = 'Search'
+      endif
+  endcase
+  assign tab_title = tab_title | default: shop.name
+
+  assign og_title = tab_title
   assign og_url = canonical_url | default: request.origin
   assign og_type = 'website'
   assign og_description = page_description | default: shop.description | default: shop.name
@@ -113,12 +135,9 @@
 >
 
 <title>
-  {{ page_title }}
+  {{ tab_title }}
   {%- if current_tags %} &ndash; tagged "{{ current_tags | join: ', ' }}"{% endif -%}
   {%- if current_page != 1 %} &ndash; Page {{ current_page }}{% endif -%}
-  {%- if page_title == blank %}{{ shop.name }}
-  {%- elsif page_title contains shop.name %}
-  {%- else %} &ndash; {{ shop.name }}{% endif -%}
 </title>
 
 <link
