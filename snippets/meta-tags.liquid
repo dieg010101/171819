@@ -4,12 +4,10 @@
 {%- comment -%}
   The colour browsers that read theme-color give their own bars: the page's
   ground (as css-variables.liquid computes it), so the bars read as the same
-  surface. Not on the password page, whose image fills the screen.
+  surface.
 {%- endcomment -%}
-{%- unless request.page_type == 'password' -%}
-  {%- assign ground_weight = 100 | minus: settings.grain_strength -%}
-  <meta name="theme-color" content="{{ settings.background_color | color_mix: '#808080', ground_weight }}">
-{%- endunless %}
+{%- assign ground_weight = 100 | minus: settings.grain_strength -%}
+<meta name="theme-color" content="{{ settings.background_color | color_mix: '#808080', ground_weight }}">
 <script>
   // iOS zooms the page into any field set under 16px when it's tapped, and
   // the theme's fields are 11px. maximum-scale stops that zoom; iOS still

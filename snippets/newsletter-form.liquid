@@ -10,6 +10,7 @@
 
   @param {string} id - Form id, unique on the page (also prefixes the field ids)
   @param {string} block - BEM block for the form's classes, e.g. 'site-footer'
+  @param {string} [submit_label] - Visible text for the submit button; without it the button is an empty square named "Subscribe"
 
   @example
   {% render 'newsletter-form', id: 'FooterNewsletter', block: 'site-footer' %}
@@ -42,7 +43,11 @@
           aria-invalid="true" aria-describedby="{{ error_id }}"
         {% endif %}
       >
-      <button class="{{ block }}__submit" type="submit" aria-label="Subscribe"></button>
+      {%- if submit_label != blank -%}
+        <button class="{{ block }}__submit" type="submit">{{ submit_label }}</button>
+      {%- else -%}
+        <button class="{{ block }}__submit" type="submit" aria-label="Subscribe"></button>
+      {%- endif -%}
     </div>
 
     {%- if form.errors -%}
